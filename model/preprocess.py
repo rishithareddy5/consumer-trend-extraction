@@ -1,15 +1,19 @@
 """
 model/preprocess.py
-Converts Excel dataset → JSONL for Gemma fine-tuning.
+Converts Excel dataset to JSONL for Gemma fine-tuning.
+Splits into train (80%) and test (20%) with stratification.
 Run: python model/preprocess.py
 """
 import json
 import pandas as pd
 from pathlib import Path
+from sklearn.model_selection import train_test_split
 
 ROOT       = Path(__file__).resolve().parent.parent
-EXCEL_PATH = ROOT / "data" / "Consumer_Trend_Extraction_Dataset.xlsx"
-JSONL_PATH = ROOT / "data" / "batch1_500.jsonl"
+DATA_DIR   = ROOT / "data"
+EXCEL_PATH = DATA_DIR / "Consumer_Trend_Extraction_Dataset.xlsx"
+TRAIN_PATH = DATA_DIR / "train.jsonl"
+TEST_PATH  = DATA_DIR / "test.jsonl"
 
 VALID_TRENDS = [
     "rising_spicy_flavor_preference","youth_driven_consumption",
@@ -35,7 +39,7 @@ small_pack_affordability_preference | plant_based_adoption | tangy_sour_flavor_r
 Rules:
 - Output ONLY valid JSON. No explanation, no extra text.
 - Format: {"retailer_feedback": "...", "trend": "..."}
-- trend MUST be exactly one label from the list. Never invent new labels."""
+- trend MUST be exactly one label. Never invent new labels."""
 
 
 def build_user_message(row):
@@ -63,30 +67,63 @@ def row_to_sample(row):
 
 
 def validate(df):
-    missing = [c for c in ["retailer_feedback","trend_label","city",
-               "store_type","season","consumer_demographic","product_category"]
-               if c not in df.columns]
+    required = ["retailer_feedback","trend_label","city",
+                "store_type","season","consumer_demographic","product_category"]
+    missing = [c for c in required if c not in df.columns]
     if missing:
         raise ValueError(f"Missing columns: {missing}")
     invalid = df[~df["trend_label"].isin(VALID_TRENDS)]["trend_label"].unique()
     if len(invalid):
-        raise ValueError(f"Invalid trends: {invalid}")
+        raise ValueError(f"Invalid trend labels: {invalid}")
+    dupes = df.duplicated("retailer_feedback").sum()
+    if dupes:
+        print(f"  Warning: {dupes} duplicate feedbacks found")
     print(f"  Validation passed — {len(df)} records, {df['trend_label'].nunique()} trends")
 
 
-def convert():
-    print(f"[preprocess] Reading: {EXCEL_PATH}")
-    df = pd.read_excel(EXCEL_PATH, sheet_name="Training_Dataset")
-    validate(df)
-    print(f"[preprocess] Converting to JSONL...")
-    JSONL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(JSONL_PATH, "w", encoding="utf-8") as f:
+def write_jsonl(df, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
         for _, row in df.iterrows():
             f.write(json.dumps(row_to_sample(row), ensure_ascii=False) + "\n")
-    print(f"[preprocess] Done — {len(df)} records → {JSONL_PATH}")
-    print("\nTrend distribution:")
-    for trend, count in df["trend_label"].value_counts().items():
+
+
+def convert():
+    print(f"\n[preprocess] Reading: {EXCEL_PATH}")
+    df = pd.read_excel(EXCEL_PATH, sheet_name="Training_Dataset")
+
+    print(f"[preprocess] Validating...")
+    validate(df)
+
+    # ── Stratified split — equal class representation in both splits ──────────
+    train_df, test_df = train_test_split(
+        df,
+        test_size=0.20,                    # 80% train, 20% test
+        stratify=df["trend_label"],        # equal classes in both
+        random_state=42                    # reproducible split every time
+    )
+
+    print(f"\n[preprocess] Split:")
+    print(f"  Total   : {len(df)} records")
+    print(f"  Train   : {len(train_df)} records (80%)")
+    print(f"  Test    : {len(test_df)} records (20%)")
+
+    print(f"\n[preprocess] Train class distribution:")
+    for trend, count in train_df["trend_label"].value_counts().items():
         print(f"  {trend:<45} {count}")
+
+    print(f"\n[preprocess] Test class distribution:")
+    for trend, count in test_df["trend_label"].value_counts().items():
+        print(f"  {trend:<45} {count}")
+
+    # ── Write JSONL files ─────────────────────────────────────────────────────
+    write_jsonl(train_df, TRAIN_PATH)
+    write_jsonl(test_df,  TEST_PATH)
+
+    print(f"\n[preprocess] Saved:")
+    print(f"  Train → {TRAIN_PATH}")
+    print(f"  Test  → {TEST_PATH}")
+    print(f"\n[preprocess] Done.")
 
 
 if __name__ == "__main__":
