@@ -1,7 +1,7 @@
 """
 view/ui.py
 Streamlit UI — MVC View layer.
-Shows top-3 trends with confidence scores + ChromaDB similar examples.
+Handles 3 response states: success | low_confidence | no_trend_detected
 Run: streamlit run view/ui.py --server.port 8501
 """
 import sys
@@ -49,6 +49,20 @@ html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
     margin-bottom: 0.6rem; font-size: 0.84rem;
 }
 .sim-trend { font-weight: 600; color: #1e3a5f; font-family: 'DM Mono', monospace; }
+
+.guard-box {
+    border-radius: 12px; padding: 1.5rem 2rem; margin: 1rem 0;
+}
+.guard-no-trend {
+    background: #fff3cd; border: 1px solid #ffc107;
+}
+.guard-low-conf {
+    background: #fff8e1; border: 1px solid #ffb300;
+}
+.guard-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+.guard-msg   { font-size: 0.9rem; color: #555; line-height: 1.6; }
+.guard-tip   { font-size: 0.82rem; color: #888; margin-top: 0.8rem;
+               padding-top: 0.8rem; border-top: 1px solid #eee; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -87,11 +101,22 @@ with st.sidebar:
     st.divider()
     st.markdown("### 🔧 Tech Stack")
     st.caption("""
-    🤖 Gemma 2B + QLoRA (4-bit)
-    🔗 PEFT + LoRA fine-tuning
-    🔍 BGE-small + ChromaDB (RAG)
-    ⚡ FastAPI controller
+    🤖 Gemma 2B + QLoRA (4-bit)\n
+    🔗 PEFT + LoRA fine-tuning\n
+    🔍 BGE-small + ChromaDB (RAG)\n
+    🛡️ Two-level confidence guard\n
+    ⚡ FastAPI controller\n
     📊 MLflow experiment tracking
+    """)
+
+    st.divider()
+    st.markdown("### 🛡️ Guard System")
+    st.caption("""
+    **Guard 1 — Similarity < 40%**\n
+    Input not recognized as retailer feedback → rejected cleanly\n\n
+    **Guard 2 — Confidence < 45%**\n
+    Input detected but too uncertain → flagged with warning\n\n
+    **Both pass → Full trend classification**
     """)
 
 # ── Main input ────────────────────────────────────────────────────────────────
@@ -99,8 +124,11 @@ st.markdown("### 🗣️ Retailer Feedback")
 feedback = st.text_area(
     label="",
     height=140,
-    placeholder='e.g. "Kids increasingly asking for cheesy dip flavors. '
-                'Competitor launched ghost pepper variant and it is flying off shelves."',
+    placeholder=(
+        'Enter a field salesperson observation...\n'
+        'e.g. "Kids increasingly asking for cheesy dip flavors. '
+        'Competitor launched ghost pepper variant and it is flying off shelves."'
+    ),
 )
 
 col1, col2 = st.columns([1, 6])
@@ -124,69 +152,147 @@ if run:
 
                 if res.status_code == 200:
                     d = res.json()
-                    st.success("✅ Trend detected successfully!")
+                    status = d.get("status", "success")
 
-                    # ── Top 3 trends ──────────────────────────────────────────
-                    st.markdown("### 🎯 Top 3 Consumer Trends")
-                    st.caption("Speaker requirement: show at least 3 trend confidences")
-
-                    for rank, label, conf, color in [
-                        ("1st — Primary",   d["primary_trend"],   d["primary_confidence"],   "#10b981"),
-                        ("2nd — Secondary", d["secondary_trend"], d["secondary_confidence"], "#3b82f6"),
-                        ("3rd — Tertiary",  d["tertiary_trend"],  d["tertiary_confidence"],  "#f59e0b"),
-                    ]:
-                        pct = int(conf * 100)
+                    # ── Guard 1: No trend detected ────────────────────────────
+                    if status == "no_trend_detected":
                         st.markdown(f"""
-                        <div class="trend-card">
-                            <div class="t-rank">{rank}</div>
-                            <div class="t-label">{label}</div>
-                            <div class="t-conf">{pct}% confidence</div>
-                            <div class="bar-bg">
-                                <div class="bar-fg" style="width:{pct}%;background:{color}"></div>
+                        <div class="guard-box guard-no-trend">
+                            <div class="guard-title">
+                                ❌ No Consumer Trend Signal Detected
                             </div>
-                        </div>""", unsafe_allow_html=True)
+                            <div class="guard-msg">{d['message']}</div>
+                            <div class="guard-tip">
+                                💡 Tip: Enter a genuine retailer field observation.
+                                Example: "Owner said customers asking for spicy chips.
+                                Mild variants not moving at all."
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-                    # ── ChromaDB similar examples ─────────────────────────────
-                    if d.get("similar_examples"):
-                        st.markdown("### 🔍 Similar Past Observations (RAG Context)")
-                        st.caption("ChromaDB retrieved these from training data to help Gemma")
-                        for i, ex in enumerate(d["similar_examples"], 1):
-                            sim = int(ex.get("similarity", 0) * 100)
+                    # ── Guard 2: Low confidence ───────────────────────────────
+                    elif status == "low_confidence":
+                        st.markdown(f"""
+                        <div class="guard-box guard-low-conf">
+                            <div class="guard-title">
+                                ⚠️ Low Confidence — Cannot Classify Reliably
+                            </div>
+                            <div class="guard-msg">{d['message']}</div>
+                            <div class="guard-tip">
+                                💡 This input may be outside the scope of the
+                                15 known FMCG consumer trend categories.
+                                Try rephrasing as a specific retailer observation.
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        # Show weak confidences for transparency
+                        if d.get("all_confidences"):
+                            with st.expander("📊 Weak Confidence Scores (for reference only)"):
+                                for trend, conf in sorted(
+                                    d["all_confidences"].items(),
+                                    key=lambda x: x[1], reverse=True
+                                )[:5]:
+                                    st.markdown(
+                                        f"`{trend}` — **{int(conf*100)}%** ⚠️"
+                                    )
+
+                    # ── Success: both guards passed ───────────────────────────
+                    else:
+                        st.success("✅ Consumer trend detected successfully!")
+
+                        # Top 3 trends with confidence bars
+                        st.markdown("### 🎯 Top 3 Consumer Trends Detected")
+                        st.caption(
+                            "AI gives probabilistic ranking — "
+                            "showing top 3 confidence scores as required"
+                        )
+
+                        for rank, label, conf, color in [
+                            ("1st — Primary",   d["primary_trend"],
+                             d["primary_confidence"],   "#10b981"),
+                            ("2nd — Secondary", d["secondary_trend"],
+                             d["secondary_confidence"], "#3b82f6"),
+                            ("3rd — Tertiary",  d["tertiary_trend"],
+                             d["tertiary_confidence"],  "#f59e0b"),
+                        ]:
+                            pct = int(conf * 100)
                             st.markdown(f"""
-                            <div class="sim-card">
-                                <div class="sim-trend">#{i} → {ex['trend']} &nbsp;({sim}% similar)</div>
-                                <div style="margin-top:0.3rem;color:#444">
-                                    {ex['feedback'][:170]}...
+                            <div class="trend-card">
+                                <div class="t-rank">{rank}</div>
+                                <div class="t-label">{label}</div>
+                                <div class="t-conf">{pct}% confidence</div>
+                                <div class="bar-bg">
+                                    <div class="bar-fg"
+                                         style="width:{pct}%;background:{color}">
+                                    </div>
                                 </div>
                             </div>""", unsafe_allow_html=True)
 
-                    # ── JSON output ───────────────────────────────────────────
-                    with st.expander("📄 Structured JSON Output"):
-                        st.json({
-                            "retailer_feedback":    feedback,
-                            "primary_trend":        d["primary_trend"],
-                            "primary_confidence":   d["primary_confidence"],
-                            "secondary_trend":      d["secondary_trend"],
-                            "secondary_confidence": d["secondary_confidence"],
-                            "tertiary_trend":       d["tertiary_trend"],
-                            "tertiary_confidence":  d["tertiary_confidence"],
-                        })
+                        # ChromaDB similar examples
+                        if d.get("similar_examples"):
+                            st.markdown(
+                                "### 🔍 Similar Past Observations (RAG Context)"
+                            )
+                            st.caption(
+                                "ChromaDB retrieved these from training data "
+                                "to help Gemma classify accurately"
+                            )
+                            for i, ex in enumerate(d["similar_examples"], 1):
+                                sim = int(ex.get("similarity", 0) * 100)
+                                st.markdown(f"""
+                                <div class="sim-card">
+                                    <div class="sim-trend">
+                                        #{i} → {ex['trend']}
+                                        &nbsp;({sim}% similar)
+                                    </div>
+                                    <div style="margin-top:0.3rem;color:#444">
+                                        {ex['feedback'][:170]}...
+                                    </div>
+                                </div>""", unsafe_allow_html=True)
 
-                    # ── All 15 confidences ────────────────────────────────────
-                    with st.expander("📊 All 15 Trend Confidence Scores"):
-                        for trend, conf in sorted(
-                            d["all_confidences"].items(),
-                            key=lambda x: x[1], reverse=True
-                        ):
-                            st.markdown(f"`{trend}` — **{int(conf*100)}%**")
+                        # JSON output
+                        with st.expander("📄 Structured JSON Output"):
+                            st.json({
+                                "retailer_feedback":    feedback,
+                                "primary_trend":        d["primary_trend"],
+                                "primary_confidence":   d["primary_confidence"],
+                                "secondary_trend":      d["secondary_trend"],
+                                "secondary_confidence": d["secondary_confidence"],
+                                "tertiary_trend":       d["tertiary_trend"],
+                                "tertiary_confidence":  d["tertiary_confidence"],
+                            })
 
+                        # All 15 confidences
+                        with st.expander("📊 All 15 Trend Confidence Scores"):
+                            for trend, conf in sorted(
+                                d["all_confidences"].items(),
+                                key=lambda x: x[1], reverse=True
+                            ):
+                                st.markdown(
+                                    f"`{trend}` — **{int(conf*100)}%**"
+                                )
+
+                elif res.status_code == 400:
+                    st.error(
+                        f"Invalid input: {res.json().get('detail','')}"
+                    )
+                elif res.status_code == 500:
+                    st.error(
+                        f"Model error: {res.json().get('detail','')}"
+                    )
                 else:
-                    st.error(f"API error {res.status_code}: {res.json().get('detail','')}")
+                    st.error(f"Unexpected error: {res.status_code}")
 
             except requests.exceptions.ConnectionError:
-                st.error("❌ Cannot connect to API. Make sure FastAPI is running:\n"
-                         "`uvicorn controller.api:app --host 0.0.0.0 --port 8000`")
+                st.error(
+                    "❌ Cannot connect to API. "
+                    "Make sure FastAPI is running:\n"
+                    "`uvicorn controller.api:app --host 0.0.0.0 --port 8000`"
+                )
             except requests.exceptions.Timeout:
-                st.error("⏳ Request timed out. Model may still be loading.")
+                st.error(
+                    "⏳ Request timed out. Model may still be loading."
+                )
             except Exception as e:
                 st.error(f"Unexpected error: {str(e)}")
