@@ -7,7 +7,10 @@ Run anytime after training: python model/evaluate.py
 import sys
 import json
 import torch
-import mlflow
+try:
+    import mlflow
+except ImportError:
+    mlflow = None
 from pathlib import Path
 from collections import defaultdict
 
@@ -122,13 +125,14 @@ def evaluate():
 
     # ── Log to MLflow ──────────────────────────────────────────────────────────
     try:
-        mlflow.set_experiment("consumer_trend_extraction")
-        with mlflow.start_run(run_name="evaluation"):
-            mlflow.log_metric("test_accuracy",    accuracy)
-            mlflow.log_metric("correct",          correct)
-            mlflow.log_metric("total",            total)
-            mlflow.log_metric("wrong_predictions",len(wrong_examples))
-            mlflow.log_artifact(str(LOG_PATH))
+        if mlflow is not None:
+            mlflow.set_experiment("consumer_trend_extraction")
+            with mlflow.start_run(run_name="evaluation"):
+                mlflow.log_metric("test_accuracy",    accuracy)
+                mlflow.log_metric("correct",          correct)
+                mlflow.log_metric("total",            total)
+                mlflow.log_metric("wrong_predictions",len(wrong_examples))
+                mlflow.log_artifact(str(LOG_PATH))
         print("Results logged to MLflow.")
     except Exception as e:
         print(f"MLflow logging skipped: {e}")

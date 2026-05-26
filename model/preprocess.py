@@ -1,17 +1,15 @@
 """
 model/preprocess.py
-Converts Excel dataset to JSONL for Gemma fine-tuning.
-Splits into train (80%) and test (20%) with stratification.
-Run: python model/preprocess.py
+Reads dataset.csv and converts to train.jsonl and test.jsonl
+80/20 stratified split
 """
 import json
 import pandas as pd
 from pathlib import Path
-from sklearn.model_selection import train_test_split
 
 ROOT       = Path(__file__).resolve().parent.parent
 DATA_DIR   = ROOT / "data"
-EXCEL_PATH = DATA_DIR / "Consumer_Trend_Extraction_Dataset.xlsx"
+CSV_PATH   = DATA_DIR / "dataset.csv"
 TRAIN_PATH = DATA_DIR / "train.jsonl"
 TEST_PATH  = DATA_DIR / "test.jsonl"
 
@@ -66,64 +64,39 @@ def row_to_sample(row):
     }
 
 
-def validate(df):
-    required = ["retailer_feedback","trend_label","city",
-                "store_type","season","consumer_demographic","product_category"]
-    missing = [c for c in required if c not in df.columns]
-    if missing:
-        raise ValueError(f"Missing columns: {missing}")
-    invalid = df[~df["trend_label"].isin(VALID_TRENDS)]["trend_label"].unique()
-    if len(invalid):
-        raise ValueError(f"Invalid trend labels: {invalid}")
-    dupes = df.duplicated("retailer_feedback").sum()
-    if dupes:
-        print(f"  Warning: {dupes} duplicate feedbacks found")
-    print(f"  Validation passed — {len(df)} records, {df['trend_label'].nunique()} trends")
+def split_dataset(df):
+    """Manual 80/20 stratified split without sklearn"""
+    train_records = []
+    test_records  = []
+    for trend in df["trend_label"].unique():
+        trend_df = df[df["trend_label"] == trend].sample(frac=1, random_state=42)
+        split    = int(len(trend_df) * 0.8)
+        train_records.append(trend_df.iloc[:split])
+        test_records.append(trend_df.iloc[split:])
+    return pd.concat(train_records), pd.concat(test_records)
 
 
 def write_jsonl(df, path):
-    path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         for _, row in df.iterrows():
             f.write(json.dumps(row_to_sample(row), ensure_ascii=False) + "\n")
 
 
 def convert():
-    print(f"\n[preprocess] Reading: {EXCEL_PATH}")
-    df = pd.read_excel(EXCEL_PATH, sheet_name="Training_Dataset")
+    print(f"[preprocess] Reading CSV: {CSV_PATH}")
+    df = pd.read_csv(CSV_PATH)
+    print(f"[preprocess] Records: {len(df)}")
+    print(f"[preprocess] Columns: {list(df.columns)}")
 
-    print(f"[preprocess] Validating...")
-    validate(df)
+    train_df, test_df = split_dataset(df)
+    print(f"[preprocess] Train: {len(train_df)} | Test: {len(test_df)}")
 
-    # ── Stratified split — equal class representation in both splits ──────────
-    train_df, test_df = train_test_split(
-        df,
-        test_size=0.20,                    # 80% train, 20% test
-        stratify=df["trend_label"],        # equal classes in both
-        random_state=42                    # reproducible split every time
-    )
-
-    print(f"\n[preprocess] Split:")
-    print(f"  Total   : {len(df)} records")
-    print(f"  Train   : {len(train_df)} records (80%)")
-    print(f"  Test    : {len(test_df)} records (20%)")
-
-    print(f"\n[preprocess] Train class distribution:")
-    for trend, count in train_df["trend_label"].value_counts().items():
-        print(f"  {trend:<45} {count}")
-
-    print(f"\n[preprocess] Test class distribution:")
-    for trend, count in test_df["trend_label"].value_counts().items():
-        print(f"  {trend:<45} {count}")
-
-    # ── Write JSONL files ─────────────────────────────────────────────────────
     write_jsonl(train_df, TRAIN_PATH)
     write_jsonl(test_df,  TEST_PATH)
 
-    print(f"\n[preprocess] Saved:")
-    print(f"  Train → {TRAIN_PATH}")
-    print(f"  Test  → {TEST_PATH}")
-    print(f"\n[preprocess] Done.")
+    print(f"[preprocess] Train → {TRAIN_PATH}")
+    print(f"[preprocess] Test  → {TEST_PATH}")
+    print(f"[preprocess] Done!")
 
 
 if __name__ == "__main__":

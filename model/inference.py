@@ -1,255 +1,59 @@
-"""
-model/inference.py
-Loads Gemma 2B + LoRA adapter.
-Returns top-3 trend labels with confidence scores.
-Speaker: "show at least 3 categories with confidence ranking"
-"""
-import json
 import torch
-import numpy as np
-import logging
-from pathlib import Path
-from transformers import (
-    AutoTokenizer,
-    AutoModelForCausalLM,
-    BitsAndBytesConfig,
-)
+import json
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
-# ── Logging ───────────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [inference] %(message)s",
-    handlers=[
-        logging.FileHandler("logs/inference.log"),
-        logging.StreamHandler(),
-    ]
-)
-log = logging.getLogger(__name__)
-
-# ── Paths ─────────────────────────────────────────────────────────────────────
-ROOT     = Path(__file__).resolve().parent.parent
-ADAPTER  = ROOT / "adapter"
-LOG_DIR  = ROOT / "logs"
-MODEL_ID = "google/gemma-2b-it"
-
-# ── Seed for reproducibility ──────────────────────────────────────────────────
-torch.manual_seed(42)
-np.random.seed(42)
-
-VALID_TRENDS = [
-    "rising_spicy_flavor_preference",
-    "youth_driven_consumption",
-    "fusion_flavor_adoption",
-    "western_snack_influence",
-    "health_conscious_snacking",
-    "premium_packaging_demand",
-    "regional_flavor_revival",
-    "convenience_format_preference",
-    "festive_gifting_trend",
-    "online_impulse_buying",
-    "sugar_free_demand",
-    "protein_snack_trend",
-    "small_pack_affordability_preference",
-    "plant_based_adoption",
-    "tangy_sour_flavor_rise",
-]
+MODEL_PATH = "/opt/ai-platform/models/gemma-2-2b-it"
+ADAPTER_PATH = "/home/aiuser9/cte/adapter"
 
 SYSTEM_PROMPT = """You are a consumer trend analyst for an FMCG company in India.
-Analyze retailer feedback from field salespersons and classify the dominant consumer
-trend into EXACTLY ONE of these 15 labels:
+Analyze retailer feedback and classify into EXACTLY ONE of these 15 trends:
+rising_spicy_flavor_preference, youth_driven_consumption, fusion_flavor_adoption,
+western_snack_influence, health_conscious_snacking, premium_packaging_demand,
+regional_flavor_revival, convenience_format_preference, festive_gifting_trend,
+online_impulse_buying, sugar_free_demand, protein_snack_trend,
+small_pack_affordability_preference, plant_based_adoption, tangy_sour_flavor_rise
+Respond ONLY with JSON: {"retailer_feedback": "...", "trend": "..."}"""
 
-rising_spicy_flavor_preference | youth_driven_consumption | fusion_flavor_adoption
-western_snack_influence | health_conscious_snacking | premium_packaging_demand
-regional_flavor_revival | convenience_format_preference | festive_gifting_trend
-online_impulse_buying | sugar_free_demand | protein_snack_trend
-small_pack_affordability_preference | plant_based_adoption | tangy_sour_flavor_rise
+def load_model():
+    print("Loading tokenizer...")
+    tokenizer = AutoTokenizer.from_pretrained(ADAPTER_PATH)
+    print("Loading base model...")
+    bnb_config = BitsAndBytesConfig(load_in_4bit=True, bnb_4bit_quant_type="nf4", bnb_4bit_compute_dtype=torch.bfloat16)
+    base_model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, quantization_config=bnb_config, device_map="auto")
+    print("Loading LoRA adapter...")
+    model = PeftModel.from_pretrained(base_model, ADAPTER_PATH)
+    model.eval()
+    print("Model ready!")
+    return model, tokenizer
 
-Rules:
-- Output ONLY valid JSON. No explanation, no extra text.
-- Format: {"retailer_feedback": "...", "trend": "..."}
-- trend MUST be exactly one label from the list. Never invent new labels."""
+def predict(feedback, model, tokenizer):
+    prompt = f"<start_of_turn>user\n{SYSTEM_PROMPT}\n\nRetailer Feedback: {feedback}<end_of_turn>\n<start_of_turn>model\n"
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_new_tokens=100, do_sample=False, pad_token_id=tokenizer.eos_token_id)
+    response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+    try:
+        return json.loads(response.strip())
+    except:
+        return {"retailer_feedback": feedback, "trend": response.strip()}
+
+if __name__ == "__main__":
+    model, tokenizer = load_model()
+    test_feedbacks = [
+        "Kids are asking for spicy chips and hot sauce flavored snacks",
+        "Customers requesting sugar-free biscuits and diet cookies",
+        "Youth buying western style cheese puffs and nachos",
+    ]
+    for feedback in test_feedbacks:
+        print(f"\nFeedback: {feedback}")
+        result = predict(feedback, model, tokenizer)
+        print(f"Result: {json.dumps(result, indent=2)}")
 
 
 class TrendPredictor:
-    """
-    Loads fine-tuned Gemma 2B + LoRA adapter.
-    Produces top-3 trend labels with confidence scores.
-    Speaker: "AI is all about probabilistic statements —
-              show at least 3 categories with confidence ranking"
-    """
-
     def __init__(self):
-        # ── Check adapter exists before loading ───────────────────────────────
-        if not ADAPTER.exists():
-            raise FileNotFoundError(
-                f"Adapter not found at {ADAPTER}. "
-                f"Run model/train.py first to generate the adapter."
-            )
-
-        # ── Create logs directory ─────────────────────────────────────────────
-        LOG_DIR.mkdir(parents=True, exist_ok=True)
-
-        log.info(f"Loading base model: {MODEL_ID}")
-        self._load_model()
-        log.info("Model ready.")
-
-    def _load_model(self):
-        bnb = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
-        )
-        self.tokenizer = AutoTokenizer.from_pretrained(str(ADAPTER))
-        self.tokenizer.pad_token = self.tokenizer.eos_token
-
-        base = AutoModelForCausalLM.from_pretrained(
-            MODEL_ID,
-            quantization_config=bnb,
-            device_map="auto",
-            trust_remote_code=True,
-        )
-        self.model = PeftModel.from_pretrained(base, str(ADAPTER))
-        self.model.eval()
-
-    def _build_prompt(
-        self,
-        feedback: str,
-        city: str = "",
-        store_type: str = "",
-        demographic: str = "",
-        season: str = "",
-        context_examples: list = None,
-    ) -> str:
-        context = ""
-        if context_examples:
-            context = "\nSimilar past observations:\n"
-            for i, ex in enumerate(context_examples, 1):
-                context += f"  {i}. {ex['feedback']} → {ex['trend']}\n"
-
-        user = f"""Analyze this retailer feedback and identify the primary consumer trend.
-
-Retailer Feedback: {feedback}
-City: {city} | Store Type: {store_type}
-Season: {season} | Consumer Demographic: {demographic}
-{context}
-Respond ONLY with JSON: {{"retailer_feedback": "...", "trend": "..."}}"""
-
-        return (
-            f"<start_of_turn>system\n{SYSTEM_PROMPT}<end_of_turn>\n"
-            f"<start_of_turn>user\n{user}<end_of_turn>\n"
-            f"<start_of_turn>model\n"
-        )
-
-    def _get_confidence_scores(self, prompt: str) -> dict:
-        """
-        Get probability for each of 15 trend labels.
-        Uses model logits — this is how confidence scores are produced.
-        Speaker: "AI can only give you ranking of confidence
-                  depending upon what it learned"
-        """
-        inputs = self.tokenizer(
-            prompt, return_tensors="pt"
-        ).to(self.model.device)
-
-        with torch.no_grad():
-            logits = self.model(**inputs).logits[0, -1, :]
-
-        scores = {}
-        for trend in VALID_TRENDS:
-            tokens = self.tokenizer.encode(
-                trend, add_special_tokens=False
-            )
-            if tokens:
-                scores[trend] = logits[tokens[0]].item()
-
-        # Softmax → proper probability distribution
-        vals  = np.array(list(scores.values()))
-        probs = np.exp(vals - vals.max()) / np.exp(vals - vals.max()).sum()
-
-        return {
-            t: round(float(p), 4)
-            for t, p in zip(scores.keys(), probs)
-        }
-
-    def _generate(self, prompt: str) -> str:
-        """Generate structured JSON output from model."""
-        inputs = self.tokenizer(
-            prompt, return_tensors="pt"
-        ).to(self.model.device)
-
-        with torch.no_grad():
-            out = self.model.generate(
-                **inputs,
-                max_new_tokens=200,
-                temperature=0.05,   # low = deterministic = reliable
-                do_sample=True,
-                pad_token_id=self.tokenizer.eos_token_id,
-            )
-
-        return self.tokenizer.decode(
-            out[0][inputs["input_ids"].shape[1]:],
-            skip_special_tokens=True,
-        ).strip()
-
-    def predict(
-        self,
-        feedback: str,
-        city: str = "",
-        store_type: str = "",
-        demographic: str = "",
-        season: str = "",
-        context_examples: list = None,
-    ) -> dict:
-        """
-        Predict consumer trend from retailer feedback.
-        Returns top-3 trends with confidence scores.
-        Logs every prediction for audit.
-        """
-        prompt = self._build_prompt(
-            feedback, city, store_type,
-            demographic, season, context_examples
-        )
-
-        # Get confidence scores across all 15 trends
-        scores = self._get_confidence_scores(prompt)
-        ranked = sorted(
-            scores.items(), key=lambda x: x[1], reverse=True
-        )
-
-        # Generate and validate JSON output
-        raw     = self._generate(prompt)
-        primary = ranked[0][0]  # default to top confidence
-        try:
-            clean  = raw.replace("```json","").replace("```","").strip()
-            parsed = json.loads(clean)
-            if parsed.get("trend") in VALID_TRENDS:
-                primary = parsed["trend"]
-        except (json.JSONDecodeError, KeyError):
-            log.warning(f"JSON parse failed — using confidence-based trend: {primary}")
-
-        result = {
-            "retailer_feedback":    feedback,
-            "primary_trend":        ranked[0][0],
-            "primary_confidence":   ranked[0][1],
-            "secondary_trend":      ranked[1][0],
-            "secondary_confidence": ranked[1][1],
-            "tertiary_trend":       ranked[2][0],
-            "tertiary_confidence":  ranked[2][1],
-            "all_confidences":      dict(ranked),
-        }
-
-        # ── Log every prediction for audit ────────────────────────────────────
-        log.info(
-            f"PREDICT | "
-            f"feedback='{feedback[:60]}' | "
-            f"primary={result['primary_trend']} "
-            f"({int(result['primary_confidence']*100)}%) | "
-            f"secondary={result['secondary_trend']} "
-            f"({int(result['secondary_confidence']*100)}%) | "
-            f"tertiary={result['tertiary_trend']} "
-            f"({int(result['tertiary_confidence']*100)}%)"
-        )
-
-        return result
+        self.model, self.tokenizer = load_model()
+    
+    def predict(self, feedback):
+        return predict(feedback, self.model, self.tokenizer)

@@ -1,24 +1,156 @@
 """
 controller/api.py
-FastAPI controller — MVC Controller layer.
-Receives feedback → ChromaDB similarity guard → Gemma inference guard → returns result.
-Run: uvicorn controller.api:app --host 0.0.0.0 --port 8000 --reload
+Consumer Trend Extraction — FastAPI backend.
+No chromadb. No embeddings. No internet calls.
 """
-import sys
-from pathlib import Path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
 
+from __future__ import annotations
+
+import logging
+import os
+import re
+from contextlib import asynccontextmanager
+from typing import List
+
+import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from peft import PeftModel
 from pydantic import BaseModel, Field
-from typing import Optional
-from model.inference import TrendPredictor
-from embeddings.search import SimilaritySearcher
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+BASE_MODEL_PATH = os.getenv("CTE_BASE_MODEL", "/opt/ai-platform/models/gemma-2-2b-it")
+ADAPTER_PATH = os.getenv("CTE_ADAPTER_PATH", "/home/aiuser9/cte/adapter")
+MAX_NEW_TOKENS = int(os.getenv("CTE_MAX_NEW_TOKENS", "64"))
+
+TREND_LABELS: List[str] = [
+    "rising_spicy_flavor_preference",
+    "youth_driven_consumption",
+    "fusion_flavor_adoption",
+    "western_snack_influence",
+    "health_conscious_snacking",
+    "premium_packaging_demand",
+    "regional_flavor_revival",
+    "convenience_format_preference",
+    "festive_gifting_trend",
+    "online_impulse_buying",
+    "sugar_free_demand",
+    "protein_snack_trend",
+    "small_pack_affordability_preference",
+    "plant_based_adoption",
+    "tangy_sour_flavor_rise",
+]
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s :: %(message)s")
+log = logging.getLogger("cte.api")
+
+
+class TrendModel:
+    def __init__(self, base_path: str, adapter_path: str):
+        log.info("Loading tokenizer from %s", base_path)
+        self.tokenizer = AutoTokenizer.from_pretrained(base_path)
+
+        log.info("Loading base model in 4-bit")
+        bnb = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_use_double_quant=True,
+        )
+        base = AutoModelForCausalLM.from_pretrained(
+            base_path,
+            quantization_config=bnb,
+            device_map="auto",
+            torch_dtype=torch.bfloat16,
+        )
+
+        log.info("Attaching LoRA adapter from %s", adapter_path)
+        self.model = PeftModel.from_pretrained(base, adapter_path)
+        self.model.eval()
+        log.info("Model ready.")
+
+    def _build_prompt(self, feedback: str) -> str:
+        user = (
+            "Classify the following retailer feedback into one of these "
+            f"consumer trend labels:\n{', '.join(TREND_LABELS)}\n\n"
+            f"Retailer feedback: {feedback}\n\n"
+            "Return ONLY the single best trend label."
+        )
+        return self.tokenizer.apply_chat_template(
+            [{"role": "user", "content": user}],
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+
+    @torch.inference_mode()
+    def predict(self, feedback: str) -> dict:
+        prompt = self._build_prompt(feedback)
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+
+        gen = self.model.generate(
+            **inputs,
+            max_new_tokens=MAX_NEW_TOKENS,
+            do_sample=False,
+            return_dict_in_generate=True,
+            output_scores=True,
+            pad_token_id=self.tokenizer.eos_token_id,
+        )
+
+        gen_ids = gen.sequences[0][inputs["input_ids"].shape[1]:]
+        decoded = self.tokenizer.decode(gen_ids, skip_special_tokens=True).strip()
+        decoded_norm = re.sub(r"\s+", "_", decoded.lower())
+        log.info("Greedy decode: %r", decoded)
+
+        if gen.scores:
+            probs = torch.softmax(gen.scores[0][0].float(), dim=-1)
+            scored = []
+            for lab in TREND_LABELS:
+                ids = self.tokenizer(lab, add_special_tokens=False).input_ids
+                p = float(probs[ids[0]].item()) if ids else 0.0
+                scored.append((lab, p))
+            total = sum(p for _, p in scored)
+            if total > 0:
+                scored = [(l, p / total) for l, p in scored]
+        else:
+            scored = [(l, 1.0 if l in decoded_norm else 0.0) for l in TREND_LABELS]
+
+        scored.sort(key=lambda x: x[1], reverse=True)
+
+        for i, (lab, _) in enumerate(scored):
+            if lab in decoded_norm and i != 0:
+                scored.insert(0, scored.pop(i))
+                break
+
+        top = scored[:3]
+        while len(top) < 3:
+            top.append((TREND_LABELS[len(top)], 0.0))
+
+        return {
+            "primary_trend": top[0][0],
+            "primary_confidence": round(top[0][1], 4),
+            "secondary_trend": top[1][0],
+            "secondary_confidence": round(top[1][1], 4),
+            "tertiary_trend": top[2][0],
+            "tertiary_confidence": round(top[2][1], 4),
+            "raw_generation": decoded,
+        }
+
+
+trend_model: TrendModel | None = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global trend_model
+    trend_model = TrendModel(BASE_MODEL_PATH, ADAPTER_PATH)
+    yield
+    trend_model = None
+
 
 app = FastAPI(
     title="Consumer Trend Extraction API",
-    description="Detects emerging FMCG consumer trends from retailer feedback — Gemma 2B + QLoRA + RAG",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -28,149 +160,40 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Thresholds ─────────────────────────────────────────────────────────────────
-SIMILARITY_THRESHOLD  = 0.40   # ChromaDB: below this = not retailer feedback
-CONFIDENCE_THRESHOLD  = 0.45   # Gemma: below this = too uncertain to classify
 
-# ── Load once at startup ───────────────────────────────────────────────────────
-print("[api] Initializing model and vectorstore...")
-predictor = TrendPredictor()
-searcher  = SimilaritySearcher()
-print("[api] Ready to serve.")
+class PredictRequest(BaseModel):
+    retailer_feedback: str = Field(..., min_length=3, max_length=2000)
 
 
-# ── Schemas ───────────────────────────────────────────────────────────────────
-class FeedbackRequest(BaseModel):
-    retailer_feedback:    str = Field(..., description="Raw salesperson observation")
-    city:                 str = Field(default="")
-    store_type:           str = Field(default="")
-    consumer_demographic: str = Field(default="")
-    season:               str = Field(default="")
+class PredictResponse(BaseModel):
+    primary_trend: str
+    primary_confidence: float
+    secondary_trend: str
+    secondary_confidence: float
+    tertiary_trend: str
+    tertiary_confidence: float
+    raw_generation: str | None = None
 
 
-class TrendResponse(BaseModel):
-    retailer_feedback:    str
-    status:               str          # "success" | "no_trend_detected" | "low_confidence"
-    message:              str
-    primary_trend:        Optional[str]
-    primary_confidence:   Optional[float]
-    secondary_trend:      Optional[str]
-    secondary_confidence: Optional[float]
-    tertiary_trend:       Optional[str]
-    tertiary_confidence:  Optional[float]
-    similar_examples:     list
-    all_confidences:      Optional[dict]
-
-
-# ── Endpoints ─────────────────────────────────────────────────────────────────
 @app.get("/health")
 def health():
-    return {"status": "ok", "model": "gemma-2b-lora", "version": "1.0.0"}
+    return {
+        "status": "ok" if trend_model is not None else "loading",
+        "labels": len(TREND_LABELS),
+    }
 
 
-@app.get("/trends")
-def list_trends():
-    from model.inference import VALID_TRENDS
-    return {"trends": VALID_TRENDS, "count": len(VALID_TRENDS)}
+@app.get("/labels")
+def labels():
+    return {"labels": TREND_LABELS}
 
 
-@app.post("/predict", response_model=TrendResponse)
-def predict(req: FeedbackRequest):
-    """
-    Main prediction endpoint with two-level guard:
-
-    Guard 1 — ChromaDB similarity check:
-      If best match similarity < 0.40 → not retailer feedback → reject early
-
-    Guard 2 — Gemma confidence check:
-      If top confidence < 0.45 → too uncertain → return low_confidence status
-
-    Only if both guards pass → return full top-3 trends with confidence scores.
-    """
-
-    # ── Basic input validation ─────────────────────────────────────────────────
-    if not req.retailer_feedback.strip():
-        raise HTTPException(status_code=400, detail="retailer_feedback cannot be empty")
-
-    if len(req.retailer_feedback.strip()) < 10:
-        raise HTTPException(status_code=400, detail="retailer_feedback too short to analyze")
-
-    # ── Step 1: ChromaDB similarity search ────────────────────────────────────
+@app.post("/predict", response_model=PredictResponse)
+def predict(req: PredictRequest):
+    if trend_model is None:
+        raise HTTPException(status_code=503, detail="Model is still loading.")
     try:
-        similar = searcher.search(req.retailer_feedback, n=3)
+        return trend_model.predict(req.retailer_feedback)
     except Exception as e:
-        similar = []
-        print(f"[api] ChromaDB error: {e}")
-
-    # ── Guard 1: Similarity threshold ─────────────────────────────────────────
-    top_similarity = similar[0]["similarity"] if similar else 0.0
-
-    if top_similarity < SIMILARITY_THRESHOLD:
-        return TrendResponse(
-            retailer_feedback=req.retailer_feedback,
-            status="no_trend_detected",
-            message=(
-                "This input does not appear to be retailer feedback. "
-                "No recognizable consumer trend signal was found. "
-                "Please enter a field observation from a salesperson "
-                "(e.g. 'Retailer says customers asking for spicy variants')."
-            ),
-            primary_trend=None,
-            primary_confidence=None,
-            secondary_trend=None,
-            secondary_confidence=None,
-            tertiary_trend=None,
-            tertiary_confidence=None,
-            similar_examples=similar,
-            all_confidences=None,
-        )
-
-    # ── Step 2: Gemma inference ───────────────────────────────────────────────
-    try:
-        result = predictor.predict(
-            feedback=req.retailer_feedback,
-            city=req.city,
-            store_type=req.store_type,
-            demographic=req.consumer_demographic,
-            season=req.season,
-            context_examples=similar,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Inference failed: {str(e)}")
-
-    # ── Guard 2: Confidence threshold ─────────────────────────────────────────
-    if result["primary_confidence"] < CONFIDENCE_THRESHOLD:
-        return TrendResponse(
-            retailer_feedback=req.retailer_feedback,
-            status="low_confidence",
-            message=(
-                f"Input detected as possible retailer feedback "
-                f"(similarity: {round(top_similarity*100)}%) "
-                f"but model confidence is too low to classify reliably "
-                f"({round(result['primary_confidence']*100)}%). "
-                f"This may be outside the scope of the 15 known trend categories."
-            ),
-            primary_trend=result["primary_trend"],
-            primary_confidence=result["primary_confidence"],
-            secondary_trend=result["secondary_trend"],
-            secondary_confidence=result["secondary_confidence"],
-            tertiary_trend=result["tertiary_trend"],
-            tertiary_confidence=result["tertiary_confidence"],
-            similar_examples=similar,
-            all_confidences=result["all_confidences"],
-        )
-
-    # ── Success: both guards passed ───────────────────────────────────────────
-    return TrendResponse(
-        retailer_feedback=req.retailer_feedback,
-        status="success",
-        message="Consumer trend detected successfully.",
-        primary_trend=result["primary_trend"],
-        primary_confidence=result["primary_confidence"],
-        secondary_trend=result["secondary_trend"],
-        secondary_confidence=result["secondary_confidence"],
-        tertiary_trend=result["tertiary_trend"],
-        tertiary_confidence=result["tertiary_confidence"],
-        similar_examples=similar,
-        all_confidences=result["all_confidences"],
-    )
+        log.exception("predict failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e

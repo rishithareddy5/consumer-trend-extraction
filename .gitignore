@@ -17,3 +17,24 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Backups from manual edits
+*.bak
+
+# Accidental Windows-path folder
+C:UsersrishiDownloadspackages/
+
+# Eval reports & runtime logs
+eval_report.json
+reliability_report.txt
+/tmp/uvicorn.log
+/tmp/streamlit.log
+
+# Cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Logs — only commit train.log as evidence
+logs/*
+!logs/train.log
