@@ -42,31 +42,8 @@ TREND_LABELS: List[str] = [
     "tangy_sour_flavor_rise",
 ]
 
-import os as _os
-_os.makedirs("logs", exist_ok=True)
-
-# Three-level logging: INFO + DEBUG + ERROR to separate files, plus console.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s :: %(message)s")
 log = logging.getLogger("cte.api")
-log.setLevel(logging.DEBUG)
-log.propagate = False
-_fmt = logging.Formatter("%(asctime)s | %(levelname)-7s | %(message)s")
-
-def _handler(path, level):
-    h = logging.FileHandler(path)
-    h.setLevel(level)
-    h.setFormatter(_fmt)
-    return h
-
-if not log.handlers:
-    _info = _handler("logs/info.log", logging.INFO)
-    _info.addFilter(lambda r: r.levelno < logging.ERROR)  # info+debug, not errors
-    _debug = _handler("logs/debug.log", logging.DEBUG)
-    _err = _handler("logs/error.log", logging.ERROR)
-    _con = logging.StreamHandler()
-    _con.setLevel(logging.INFO)
-    _con.setFormatter(_fmt)
-    for _h in (_info, _debug, _err, _con):
-        log.addHandler(_h)
 
 
 class TrendModel:
@@ -139,8 +116,6 @@ class TrendModel:
 
     @torch.inference_mode()  # pragma: no cover
     def predict(self, feedback: str) -> dict:
-        log.info("Prediction requested | feedback length=%d chars", len(feedback))
-        log.debug("Raw feedback text: %r", feedback)
         prompt = self._build_prompt(feedback)
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
 
@@ -156,7 +131,7 @@ class TrendModel:
         gen_ids = gen.sequences[0][inputs["input_ids"].shape[1]:]
         decoded = self.tokenizer.decode(gen_ids, skip_special_tokens=True).strip()
         decoded_norm = re.sub(r"\s+", "_", decoded.lower())
-        log.debug("Greedy decode produced raw label: %r", decoded)
+        log.info("Greedy decode: %r", decoded)
 
         scored = self._score_labels(gen, decoded_norm, prompt=prompt)
 
