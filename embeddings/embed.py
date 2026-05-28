@@ -16,10 +16,10 @@ EMBED_MODEL = "BAAI/bge-small-en-v1.5"
 
 
 def build_index():
-    print(f"[embed] Loading dataset...")
+    print("[embed] Loading dataset...")
     df = pd.read_excel(EXCEL_PATH, sheet_name="Training_Dataset")
 
-    print(f"[embed] Loading BGE-small embedder...")
+    print("[embed] Loading BGE-small embedder...")
     embedder = SentenceTransformer(EMBED_MODEL)
 
     print(f"[embed] Generating embeddings for {len(df)} feedbacks...")
@@ -38,7 +38,7 @@ def build_index():
     # Clear existing if re-indexing
     if collection.count() > 0:
         collection.delete(ids=collection.get()["ids"])
-        print(f"[embed] Cleared existing index.")
+        print("[embed] Cleared existing index.")
 
     collection.add(
         embeddings=embeddings,

@@ -8,7 +8,7 @@ from trl import SFTTrainer
 
 ROOT = Path(__file__).resolve().parent.parent
 TRAIN_PATH = ROOT / "data" / "train.jsonl"
-OUTPUT_DIR = ROOT / "adapter"
+OUTPUT_DIR = ROOT / "adapter_v2"
 LOG_DIR = ROOT / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 

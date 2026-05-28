@@ -96,7 +96,7 @@ def convert():
 
     print(f"[preprocess] Train → {TRAIN_PATH}")
     print(f"[preprocess] Test  → {TEST_PATH}")
-    print(f"[preprocess] Done!")
+    print("[preprocess] Done!")
 
 
 if __name__ == "__main__":

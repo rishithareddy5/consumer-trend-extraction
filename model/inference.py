@@ -1,10 +1,12 @@
+import os
 import torch
 import json
+import re
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
 MODEL_PATH = "/opt/ai-platform/models/gemma-2-2b-it"
-ADAPTER_PATH = "/home/aiuser9/cte/adapter"
+ADAPTER_PATH = os.getenv("CTE_ADAPTER_PATH", "/opt/ai-platform/workspaces/aiuser9/cte/adapter")
 
 SYSTEM_PROMPT = """You are a consumer trend analyst for an FMCG company in India.
 Analyze retailer feedback and classify into EXACTLY ONE of these 15 trends:
@@ -33,10 +35,17 @@ def predict(feedback, model, tokenizer):
     with torch.no_grad():
         outputs = model.generate(**inputs, max_new_tokens=100, do_sample=False, pad_token_id=tokenizer.eos_token_id)
     response = tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
+    resp = response.strip()
     try:
-        return json.loads(response.strip())
-    except:
-        return {"retailer_feedback": feedback, "trend": response.strip()}
+        return json.loads(resp)
+    except Exception:
+        fixed = re.sub(r'("trend"\s*:\s*)([a-z_]+)', r'\1"\2"', resp)
+        try:
+            return json.loads(fixed)
+        except Exception:
+            match = re.search(r'"trend"\s*:\s*"?([a-z_]+)"?', resp)
+            label = match.group(1) if match else resp
+            return {"retailer_feedback": feedback, "trend": label}
 
 if __name__ == "__main__":
     model, tokenizer = load_model()

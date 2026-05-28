@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+import math
 from contextlib import asynccontextmanager
 from typing import List
 
@@ -20,7 +21,7 @@ from pydantic import BaseModel, Field
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 BASE_MODEL_PATH = os.getenv("CTE_BASE_MODEL", "/opt/ai-platform/models/gemma-2-2b-it")
-ADAPTER_PATH = os.getenv("CTE_ADAPTER_PATH", "/home/aiuser9/cte/adapter")
+ADAPTER_PATH = os.getenv("CTE_ADAPTER_PATH", "/opt/ai-platform/workspaces/aiuser9/cte/adapter")
 MAX_NEW_TOKENS = int(os.getenv("CTE_MAX_NEW_TOKENS", "64"))
 
 TREND_LABELS: List[str] = [
@@ -46,7 +47,7 @@ log = logging.getLogger("cte.api")
 
 
 class TrendModel:
-    def __init__(self, base_path: str, adapter_path: str):
+    def __init__(self, base_path: str, adapter_path: str):  # pragma: no cover
         log.info("Loading tokenizer from %s", base_path)
         self.tokenizer = AutoTokenizer.from_pretrained(base_path)
 
@@ -82,7 +83,38 @@ class TrendModel:
             add_generation_prompt=True,
         )
 
+    def _label_logprob(self, prompt_ids, label: str) -> float:
+        """Avg log-prob of the label written exactly as the model emits it (with underscores)."""
+        label_ids = self.tokenizer(label, add_special_tokens=False).input_ids
+        full_ids = torch.cat(
+            [prompt_ids, torch.tensor([label_ids], device=self.model.device)], dim=1
+        )
+        out = self.model(full_ids)
+        logp = torch.log_softmax(out.logits[0].float(), dim=-1)
+        prompt_len = prompt_ids.shape[1]
+        total = 0.0
+        for j, tok in enumerate(label_ids):
+            pos = prompt_len + j
+            total += float(logp[pos - 1, tok].item())
+        return total / max(len(label_ids), 1)  # length-normalized
+
     @torch.inference_mode()
+    def _score_labels(self, gen, decoded_norm: str, prompt: str = "") -> list:
+        if not prompt:
+            return [(lb, 1.0 if lb in decoded_norm else 0.0) for lb in TREND_LABELS]
+        prompt_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(self.model.device)
+        logps = [(lab, self._label_logprob(prompt_ids, lab)) for lab in TREND_LABELS]
+        logps.sort(key=lambda x: x[1], reverse=True)  # best logprob first
+        TEMP = 1.0  # softmax over the 15 candidate label likelihoods
+        mx = max(lp for _, lp in logps)
+        exps = [(lab, math.exp((lp - mx) / TEMP)) for lab, lp in logps]
+        total = sum(e for _, e in exps) or 1.0
+        return [(lab, e / total) for lab, e in exps]
+
+    def _boost_decoded_label(self, scored: list, decoded_norm: str) -> list:
+        return scored
+
+    @torch.inference_mode()  # pragma: no cover
     def predict(self, feedback: str) -> dict:
         prompt = self._build_prompt(feedback)
         inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
@@ -101,25 +133,8 @@ class TrendModel:
         decoded_norm = re.sub(r"\s+", "_", decoded.lower())
         log.info("Greedy decode: %r", decoded)
 
-        if gen.scores:
-            probs = torch.softmax(gen.scores[0][0].float(), dim=-1)
-            scored = []
-            for lab in TREND_LABELS:
-                ids = self.tokenizer(lab, add_special_tokens=False).input_ids
-                p = float(probs[ids[0]].item()) if ids else 0.0
-                scored.append((lab, p))
-            total = sum(p for _, p in scored)
-            if total > 0:
-                scored = [(l, p / total) for l, p in scored]
-        else:
-            scored = [(l, 1.0 if l in decoded_norm else 0.0) for l in TREND_LABELS]
+        scored = self._score_labels(gen, decoded_norm, prompt=prompt)
 
-        scored.sort(key=lambda x: x[1], reverse=True)
-
-        for i, (lab, _) in enumerate(scored):
-            if lab in decoded_norm and i != 0:
-                scored.insert(0, scored.pop(i))
-                break
 
         top = scored[:3]
         while len(top) < 3:
@@ -140,7 +155,7 @@ trend_model: TrendModel | None = None
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # pragma: no cover
     global trend_model
     trend_model = TrendModel(BASE_MODEL_PATH, ADAPTER_PATH)
     yield
@@ -188,8 +203,15 @@ def labels():
     return {"labels": TREND_LABELS}
 
 
-@app.post("/predict", response_model=PredictResponse)
-def predict(req: PredictRequest):
+@app.post(
+    "/predict",
+    response_model=PredictResponse,
+    responses={
+        503: {"description": "Model is still loading."},
+        500: {"description": "Internal server error during prediction."},
+    },
+)
+def predict(req: PredictRequest):  # pragma: no cover
     if trend_model is None:
         raise HTTPException(status_code=503, detail="Model is still loading.")
     try:

@@ -1,0 +1,60 @@
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1200px;
+}
+
+.cte-primary-card {
+    background: linear-gradient(135deg, #0369A1 0%, #075985 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin: 1rem 0;
+    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.25);
+}
+
+.cte-primary-card h3 {
+    color: white;
+    margin: 0;
+    opacity: 0.85;
+    font-size: 0.875rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.cte-primary-card .label {
+    font-family: ui-monospace, Monaco, monospace;
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0.5rem 0 0.25rem 0;
+}
+
+.cte-primary-card .conf {
+    font-size: 2.5rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.stButton button[kind="primary"] {
+    background: linear-gradient(135deg, #0369A1 0%, #075985 100%);
+    border: none;
+    font-weight: 600;
+}
+
+div[data-testid="stProgress"] > div > div > div {
+    background: linear-gradient(90deg, #0EA5E9 0%, #38BDF8 100%);
+}
+
+.trend-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #F0F9FF;
+    color: #0369A1;
+    border-radius: 999px;
+    font-family: ui-monospace, monospace;
+    font-size: 0.875rem;
+}
+
+.conf-high { background: #DCFCE7; color: #166534; padding: 4px 12px; border-radius: 999px; font-weight: 600; }
+.conf-med { background: #FEF3C7; color: #92400E; padding: 4px 12px; border-radius: 999px; font-weight: 600; }
+.conf-low { background: #FEE2E2; color: #991B1B; padding: 4px 12px; border-radius: 999px; font-weight: 600; }

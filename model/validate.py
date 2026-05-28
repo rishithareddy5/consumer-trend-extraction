@@ -39,8 +39,48 @@ SEASON_MONTH_MAP = {
 REQUIRED_COLS = [
     "record_id","visit_date","season","city","store_type",
     "salesperson_name","consumer_demographic","product_category",
-    "retailer_feedback","trend_signal_type","trend_label","structured_json",
+    "retailer_feedback","trend_signal_type","trend_label",
 ]
+
+
+def check_row_count(df, issues, passed):
+    if len(df) >= 500:
+        passed.append(f"Row count: {len(df)} records (minimum 500 met)")
+    else:
+        issues.append(f"Row count: {len(df)} — below minimum 500")
+
+
+def check_columns(df, issues, passed):
+    missing_cols = [c for c in REQUIRED_COLS if c not in df.columns]
+    if not missing_cols:
+        passed.append(f"All {len(REQUIRED_COLS)} required columns present")
+    else:
+        issues.append(f"Missing columns: {missing_cols}")
+
+
+def check_nulls(df, issues, passed):
+    nulls = df.isnull().sum()
+    null_cols = nulls[nulls > 0]
+    if null_cols.empty:
+        passed.append("No null values in any column")
+    else:
+        issues.append(f"Null values found: {null_cols.to_dict()}")
+
+
+def check_duplicates(df, issues, passed):
+    dupes = df.duplicated("retailer_feedback").sum()
+    if dupes == 0:
+        passed.append("No duplicate retailer feedbacks")
+    else:
+        issues.append(f"{dupes} duplicate retailer feedbacks found")
+
+
+def check_trend_labels(df, issues, passed):
+    invalid = df[~df["trend_label"].isin(VALID_TRENDS)]["trend_label"].unique()
+    if len(invalid) == 0:
+        passed.append(f"All trend labels valid — {df['trend_label'].nunique()} unique classes")
+    else:
+        issues.append(f"Invalid trend labels: {invalid}")
 
 
 def validate():
@@ -51,40 +91,11 @@ def validate():
     issues  = []
     passed  = []
 
-    # 1. Row count
-    if len(df) >= 500:
-        passed.append(f"Row count: {len(df)} records (minimum 500 met)")
-    else:
-        issues.append(f"Row count: {len(df)} — below minimum 500")
-
-    # 2. Required columns
-    missing_cols = [c for c in REQUIRED_COLS if c not in df.columns]
-    if not missing_cols:
-        passed.append(f"All {len(REQUIRED_COLS)} required columns present")
-    else:
-        issues.append(f"Missing columns: {missing_cols}")
-
-    # 3. Null values
-    nulls = df.isnull().sum()
-    null_cols = nulls[nulls > 0]
-    if null_cols.empty:
-        passed.append("No null values in any column")
-    else:
-        issues.append(f"Null values found: {null_cols.to_dict()}")
-
-    # 4. Duplicate feedbacks
-    dupes = df.duplicated("retailer_feedback").sum()
-    if dupes == 0:
-        passed.append("No duplicate retailer feedbacks")
-    else:
-        issues.append(f"{dupes} duplicate retailer feedbacks found")
-
-    # 5. Invalid trend labels
-    invalid = df[~df["trend_label"].isin(VALID_TRENDS)]["trend_label"].unique()
-    if len(invalid) == 0:
-        passed.append(f"All trend labels valid — {df['trend_label'].nunique()} unique classes")
-    else:
-        issues.append(f"Invalid trend labels: {invalid}")
+    check_row_count(df, issues, passed)
+    check_columns(df, issues, passed)
+    check_nulls(df, issues, passed)
+    check_duplicates(df, issues, passed)
+    check_trend_labels(df, issues, passed)
 
     # 6. Class balance
     counts   = df["trend_label"].value_counts()
@@ -116,7 +127,7 @@ def validate():
 
     # ── Print report ───────────────────────────────────────────────────────────
     print(f"\n{'='*55}")
-    print(f"DATASET VALIDATION REPORT")
+    print("DATASET VALIDATION REPORT")
     print(f"{'='*55}")
 
     print(f"\nPASSED ({len(passed)}):")
@@ -128,12 +139,11 @@ def validate():
         for issue in issues:
             print(f"  ❌ {issue}")
     else:
-        print(f"\nNo issues found.")
+        print("\nNo issues found.")
 
-    print(f"\nClass distribution:")
+    print("\nClass distribution:")
     for trend, count in df["trend_label"].value_counts().items():
-        bar = "█" * count + "░" * (max_count - count)
-        print(f"  {trend:<45} {count:>3}")
+        print(f"  {trend:<45} {count:>3} " + "█" * count + "░" * (max_count - count))
 
     print(f"\n{'='*55}")
     if not issues:

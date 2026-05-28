@@ -15,17 +15,45 @@ from pathlib import Path
 from collections import defaultdict
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from model.inference import TrendPredictor, VALID_TRENDS
+from model.inference import TrendPredictor
+
+VALID_TRENDS = [
+    "rising_spicy_flavor_preference", "youth_driven_consumption",
+    "fusion_flavor_adoption", "western_snack_influence",
+    "health_conscious_snacking", "premium_packaging_demand",
+    "regional_flavor_revival", "convenience_format_preference",
+    "festive_gifting_trend", "online_impulse_buying",
+    "sugar_free_demand", "protein_snack_trend",
+    "small_pack_affordability_preference", "plant_based_adoption",
+    "tangy_sour_flavor_rise",
+]
 
 ROOT      = Path(__file__).resolve().parent.parent
 TEST_PATH = ROOT / "data" / "test.jsonl"
 LOG_PATH  = ROOT / "data" / "evaluation_log.json"
 
 
+def extract_feedback(user_msg: str) -> str:
+    """Extract retailer feedback text from the user message."""
+    feedback_line = [l for l in user_msg.split("\n") if l.startswith("Retailer Feedback:")]
+    if feedback_line:
+        return feedback_line[0].replace("Retailer Feedback:", "").strip()
+    return user_msg[:100]
+
+
+def load_test_records() -> list:
+    """Load test records from test.jsonl."""
+    records = []
+    with open(TEST_PATH, "r") as f:
+        for line in f:
+            records.append(json.loads(line))
+    return records
+
+
 def evaluate():
     if not TEST_PATH.exists():
         print(f"[evaluate] ERROR: test.jsonl not found at {TEST_PATH}")
-        print(f"[evaluate] Run preprocess.py first to generate train/test splits.")
+        print("[evaluate] Run preprocess.py first to generate train/test splits.")
         return
 
     print(f"[evaluate] Loading test data from {TEST_PATH}")
@@ -35,7 +63,7 @@ def evaluate():
             test_records.append(json.loads(line))
     print(f"[evaluate] Test records: {len(test_records)}")
 
-    print(f"[evaluate] Loading model...")
+    print("[evaluate] Loading model...")
     predictor = TrendPredictor()
 
     correct        = 0
@@ -44,20 +72,29 @@ def evaluate():
     wrong_examples = []
     all_results    = []
 
-    print(f"[evaluate] Running predictions...")
+    correct_top2 = 0
+    print("[evaluate] Running predictions...")
     for i, sample in enumerate(test_records):
         messages   = sample["messages"]
         user_msg   = messages[1]["content"]
         true_trend = json.loads(messages[2]["content"])["trend"]
 
-        # Extract feedback from user message
-        feedback_line = [l for l in user_msg.split("\n") if l.startswith("Retailer Feedback:")]
-        feedback = feedback_line[0].replace("Retailer Feedback:", "").strip() if feedback_line else user_msg[:100]
+        feedback = extract_feedback(user_msg)
 
         result     = predictor.predict(feedback)
-        predicted  = result["primary_trend"]
-        confidence = result["primary_confidence"]
+        _raw = result.get("primary_trend") or result.get("trend", "unknown")
+        if isinstance(_raw, str) and _raw.strip().startswith("{"):
+            try:
+                _raw = json.loads(_raw).get("trend", _raw)
+            except Exception:
+                pass
+        predicted = _raw
+        secondary = result.get("secondary_trend", "")
+        confidence = result.get("primary_confidence", 1.0)
         is_correct = (predicted == true_trend)
+        is_correct_top2 = is_correct or (secondary == true_trend)
+        if is_correct_top2:
+            correct_top2 += 1
 
         if is_correct:
             correct += 1
@@ -90,12 +127,14 @@ def evaluate():
     accuracy = round(correct / total * 100, 2) if total > 0 else 0
 
     print(f"\n{'='*55}")
-    print(f"EVALUATION RESULTS")
+    print("EVALUATION RESULTS")
     print(f"{'='*55}")
+    accuracy_top2 = round(correct_top2 / total * 100, 2) if total > 0 else 0
     print(f"Overall Accuracy : {accuracy}%  ({correct}/{total})")
+    print(f"Top-2 Accuracy   : {accuracy_top2}%  ({correct_top2}/{total})")
     print(f"Wrong predictions: {len(wrong_examples)}")
 
-    print(f"\nPer-class accuracy:")
+    print("\nPer-class accuracy:")
     for trend in VALID_TRENDS:
         stats    = per_class[trend]
         cls_acc  = round(stats["correct"] / stats["total"] * 100, 1) if stats["total"] > 0 else 0
@@ -103,7 +142,7 @@ def evaluate():
         print(f"  {trend:<45} {bar} {cls_acc}% ({stats['correct']}/{stats['total']})")
 
     if wrong_examples:
-        print(f"\nFirst 5 wrong predictions:")
+        print("\nFirst 5 wrong predictions:")
         for ex in wrong_examples[:5]:
             print(f"  Record {ex['record']}: {ex['feedback'][:60]}...")
             print(f"    True:      {ex['true']}")
@@ -113,6 +152,7 @@ def evaluate():
     # ── Save log ───────────────────────────────────────────────────────────────
     log = {
         "accuracy":       accuracy,
+        "accuracy_top2":  accuracy_top2,
         "correct":        correct,
         "total":          total,
         "per_class":      {k: v for k, v in per_class.items()},
@@ -129,6 +169,7 @@ def evaluate():
             mlflow.set_experiment("consumer_trend_extraction")
             with mlflow.start_run(run_name="evaluation"):
                 mlflow.log_metric("test_accuracy",    accuracy)
+                mlflow.log_metric("test_accuracy_top2", accuracy_top2)
                 mlflow.log_metric("correct",          correct)
                 mlflow.log_metric("total",            total)
                 mlflow.log_metric("wrong_predictions",len(wrong_examples))
