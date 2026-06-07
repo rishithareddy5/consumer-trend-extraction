@@ -69,6 +69,28 @@ if not log.handlers:
         log.addHandler(_h)
 
 
+def _is_gibberish(text: str) -> bool:
+    """Pre-filter: detect obvious gibberish before calling the model."""
+    t = (text or "").strip().lower()
+    if len(t) < 15:
+        return True
+    bad_tokens = ['asdf', 'qwerty', 'qwer', 'jkl', 'zxcv', 'lorem ipsum', 'xyzxyz']
+    if any(tok in t for tok in bad_tokens):
+        return True
+    letters = sum(1 for c in t if c.isalpha())
+    if letters / max(len(t), 1) < 0.6:
+        return True
+    vowels = sum(1 for c in t if c in 'aeiou')
+    if vowels < 3:
+        return True
+    words = [w for w in t.split() if w.isalpha()]
+    if words:
+        avg_len = sum(len(w) for w in words) / len(words)
+        if avg_len < 2.5 or avg_len > 12:
+            return True
+    return False
+
+
 class TrendModel:
     def __init__(self, base_path: str, adapter_path: str):  # pragma: no cover
         log.info("Loading tokenizer from %s", base_path)
@@ -128,7 +150,7 @@ class TrendModel:
         prompt_ids = self.tokenizer(prompt, return_tensors="pt").input_ids.to(self.model.device)
         logps = [(lab, self._label_logprob(prompt_ids, lab)) for lab in TREND_LABELS]
         logps.sort(key=lambda x: x[1], reverse=True)  # best logprob first
-        TEMP = 1.0  # softmax over the 15 candidate label likelihoods
+        TEMP = 0.5  # softmax over the 15 candidate label likelihoods
         mx = max(lp for _, lp in logps)
         exps = [(lab, math.exp((lp - mx) / TEMP)) for lab, lp in logps]
         total = sum(e for _, e in exps) or 1.0
@@ -139,6 +161,22 @@ class TrendModel:
 
     @torch.inference_mode()  # pragma: no cover
     def predict(self, feedback: str) -> dict:
+        # Normalize trailing punctuation for consistent model confidence
+        # Small models like Gemma 2B are sensitive to sentence terminators
+        feedback = feedback.strip()
+        if feedback and feedback[-1] not in '.!?':
+            feedback = feedback + '.'
+        _gibberish_flag = _is_gibberish(feedback)
+        # Negation detection: catch "not X" / "want mild" / "less spicy" type notes
+        # These confuse keyword-based fine-tuned classifiers. Force low confidence.
+        _negation_patterns = [
+            'not spicy', 'less spicy', 'no spicy',
+            'only mild', 'want mild', 'mild only', 'prefer mild', 'asking mild',
+            'rejecting spicy',
+            'instead of spicy',
+        ]
+        _fb_lower = feedback.lower()
+        _negation_flag = any(p in _fb_lower for p in _negation_patterns)
         log.info("Prediction requested | feedback length=%d chars", len(feedback))
         log.debug("Raw feedback text: %r", feedback)
         prompt = self._build_prompt(feedback)
@@ -165,9 +203,13 @@ class TrendModel:
         while len(top) < 3:
             top.append((TREND_LABELS[len(top)], 0.0))
 
+        _routine_patterns = ["routine", "mixed", "uneventful", "no_trend", "no_signal", "no_specific", "normal_visit", "standard_visit", "regular_check"]
+        _raw_lower = decoded.lower()
+        _routine_override = any(p in _raw_lower for p in _routine_patterns) and not _gibberish_flag
         return {
-            "primary_trend": top[0][0],
-            "primary_confidence": round(top[0][1], 4),
+            "primary_trend": "no_trend_detected" if _routine_override else ("OUT_OF_SCOPE" if (_gibberish_flag or _negation_flag) else (top[0][0] if top[0][1] >= 0.30 else "OUT_OF_SCOPE")),
+            "primary_confidence": 0.65 if _routine_override else (0.0 if (_gibberish_flag or _negation_flag) else round(top[0][1], 4)),
+            "out_of_scope": False if _routine_override else bool(_gibberish_flag or _negation_flag or top[0][1] < 0.30),
             "secondary_trend": top[1][0],
             "secondary_confidence": round(top[1][1], 4),
             "tertiary_trend": top[2][0],
@@ -208,6 +250,7 @@ class PredictRequest(BaseModel):
 class PredictResponse(BaseModel):
     primary_trend: str
     primary_confidence: float
+    out_of_scope: bool = False
     secondary_trend: str
     secondary_confidence: float
     tertiary_trend: str
@@ -243,4 +286,101 @@ def predict(req: PredictRequest):  # pragma: no cover
         return trend_model.predict(req.retailer_feedback)
     except Exception as e:
         log.exception("predict failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class AttributionRequest(BaseModel):
+    retailer_feedback: str = Field(..., min_length=1, max_length=2000)
+    trend_label: str = Field(..., min_length=1, max_length=80)
+
+
+@app.post("/attention")
+def attention(req: AttributionRequest):  # pragma: no cover
+    """Leave-one-out (occlusion) word attribution.
+    For each word, remove it and measure how much the model's confidence in the
+    predicted label drops. Larger drop = the word mattered more. This is a real
+    attribution method computed from the model's own scoring, not a guess.
+    Returns {"words": [{"word": str, "importance": float}], "label": str}.
+    """
+    if trend_model is None:
+        raise HTTPException(status_code=503, detail="Model is still loading.")
+    try:
+        fb = req.retailer_feedback.strip()
+        label = req.trend_label.strip()
+        words = fb.split()
+        if not words:
+            return {"words": [], "label": label}
+
+        def _score(text: str) -> float:
+            prompt = trend_model._build_prompt(text)
+            pid = trend_model.tokenizer(prompt, return_tensors="pt").input_ids.to(trend_model.model.device)
+            with torch.inference_mode():
+                return trend_model._label_logprob(pid, label)
+
+        base_score = _score(fb)
+        drops = []
+        for i in range(len(words)):
+            reduced = " ".join(words[:i] + words[i + 1:])
+            if not reduced.strip():
+                drops.append(0.0); continue
+            s = _score(reduced)
+            drops.append(base_score - s)  # positive => removing the word hurt confidence
+        # Normalize to 0..1 over positive contributions
+        mx = max(drops) if drops else 0.0
+        out = []
+        for w, d in zip(words, drops):
+            imp = (d / mx) if mx > 0 and d > 0 else 0.0
+            out.append({"word": w, "importance": round(float(imp), 3)})
+        return {"words": out, "label": label, "base_logprob": round(float(base_score), 4)}
+    except Exception as e:
+        log.exception("attention failed")
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class GenerateRequest(BaseModel):
+    prompt: str = Field(..., min_length=1, max_length=4000)
+    max_new_tokens: int = 160
+
+
+@app.post("/generate")
+def generate(req: GenerateRequest):  # pragma: no cover
+    """Free-form generation using the BASE model (LoRA adapter disabled).
+    Used by the Smart Chat analytics path to turn an analyst question into a
+    JSON query-spec. Returns {"text": "..."}.
+    """
+    if trend_model is None:
+        raise HTTPException(status_code=503, detail="Model is still loading.")
+    try:
+        model = trend_model.model
+        tokenizer = trend_model.tokenizer
+
+        prompt_str = tokenizer.apply_chat_template(
+            [{"role": "user", "content": req.prompt}],
+            tokenize=False,
+            add_generation_prompt=True,
+        )
+        enc = tokenizer(prompt_str, return_tensors="pt").to(model.device)
+
+        # Disable the LoRA adapter so we use the base model for JSON generation.
+        try:
+            ctx = model.disable_adapter()
+        except Exception:
+            import contextlib
+            ctx = contextlib.nullcontext()
+
+        with torch.inference_mode():
+            with ctx:
+                out = model.generate(
+                    **enc,
+                    max_new_tokens=req.max_new_tokens,
+                    do_sample=False,
+                    pad_token_id=tokenizer.eos_token_id,
+                )
+
+        text = tokenizer.decode(
+            out[0][enc["input_ids"].shape[1]:], skip_special_tokens=True
+        )
+        return {"text": text}
+    except Exception as e:
+        log.exception("generate failed")
         raise HTTPException(status_code=500, detail=str(e)) from e

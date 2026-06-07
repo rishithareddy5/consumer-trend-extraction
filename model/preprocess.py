@@ -26,13 +26,13 @@ VALID_TRENDS = [
 
 SYSTEM_PROMPT = """You are a consumer trend analyst for an FMCG company in India.
 Analyze retailer feedback from field salespersons and classify the dominant consumer
-trend into EXACTLY ONE of these 15 labels:
+trend into EXACTLY ONE of these 16 labels:
 
 rising_spicy_flavor_preference | youth_driven_consumption | fusion_flavor_adoption
 western_snack_influence | health_conscious_snacking | premium_packaging_demand
 regional_flavor_revival | convenience_format_preference | festive_gifting_trend
 online_impulse_buying | sugar_free_demand | protein_snack_trend
-small_pack_affordability_preference | plant_based_adoption | tangy_sour_flavor_rise
+small_pack_affordability_preference | plant_based_adoption | tangy_sour_flavor_rise | no_trend_detected
 
 Rules:
 - Output ONLY valid JSON. No explanation, no extra text.

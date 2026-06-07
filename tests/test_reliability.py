@@ -62,7 +62,7 @@ def main():
     ap.add_argument("--seed", type=int, default=42)
     args = ap.parse_args()
 
-    rng = random.Random(args.seed)
+    rng = random.Random(args.seed)  # NOSONAR - non-crypto random is fine for test question shuffling
 
     print("=" * 72)
     print("PASS 1 - baseline (10 questions in order)")

@@ -1,15 +1,19 @@
 {
-  "accuracy": 80.95,
-  "accuracy_top2": 80.95,
-  "correct": 85,
-  "total": 105,
+  "accuracy": 78.9,
+  "accuracy_top2": 78.9,
+  "correct": 86,
+  "total": 109,
   "per_class": {
     "rising_spicy_flavor_preference": {
       "correct": 6,
       "total": 7
     },
     "youth_driven_consumption": {
-      "correct": 5,
+      "correct": 6,
+      "total": 8
+    },
+    "small_pack_affordability_preference": {
+      "correct": 6,
       "total": 7
     },
     "fusion_flavor_adoption": {
@@ -25,15 +29,19 @@
       "total": 7
     },
     "premium_packaging_demand": {
-      "correct": 4,
+      "correct": 5,
+      "total": 7
+    },
+    "convenience_format_preference": {
+      "correct": 7,
       "total": 7
     },
     "regional_flavor_revival": {
       "correct": 7,
       "total": 7
     },
-    "convenience_format_preference": {
-      "correct": 7,
+    "tangy_sour_flavor_rise": {
+      "correct": 3,
       "total": 7
     },
     "festive_gifting_trend": {
@@ -52,17 +60,13 @@
       "correct": 5,
       "total": 7
     },
-    "small_pack_affordability_preference": {
-      "correct": 7,
-      "total": 7
-    },
     "plant_based_adoption": {
       "correct": 7,
       "total": 7
     },
-    "tangy_sour_flavor_rise": {
-      "correct": 3,
-      "total": 7
+    "no_trend_detected": {
+      "correct": 0,
+      "total": 3
     }
   },
   "wrong_examples": [
@@ -74,136 +78,157 @@
       "confidence": 1.0
     },
     {
-      "record": 8,
+      "record": 11,
       "feedback": "Students comparing pack sizes and prices loudly in store. Very price-value consc",
       "true": "youth_driven_consumption",
       "predicted": "small_pack_affordability_preference",
       "confidence": 1.0
     },
     {
-      "record": 11,
-      "feedback": "Pocket money buyers - rupees 10 max per purchase but come every day. Volume adds",
+      "record": 14,
+      "feedback": "Students requesting brands they saw advertised during cricket matches. Very medi",
       "true": "youth_driven_consumption",
-      "predicted": "small_pack_affordability_preference",
+      "predicted": "western_snack_influence",
       "confidence": 1.0
     },
     {
-      "record": 18,
+      "record": 22,
+      "feedback": "Owner near tea stall said customers pair tea with rupees 5 snack pack. Daily rit",
+      "true": "small_pack_affordability_preference",
+      "predicted": "plant_based_adoption",
+      "confidence": 1.0
+    },
+    {
+      "record": 26,
       "feedback": "I heard customer ask retailer for biryani-flavored chips. Retailer had no idea w",
       "true": "fusion_flavor_adoption",
       "predicted": "regional_flavor_revival",
       "confidence": 1.0
     },
     {
-      "record": 19,
+      "record": 27,
       "feedback": "Fusion bhujia - someone wants it masala with a western twist. Strange but real r",
       "true": "fusion_flavor_adoption",
       "predicted": "western_snack_influence",
       "confidence": 1.0
     },
     {
-      "record": 21,
+      "record": 29,
       "feedback": "Retailer said fusion snack brand entered his market, customers comparing with ou",
       "true": "fusion_flavor_adoption",
       "predicted": "western_snack_influence",
       "confidence": 1.0
     },
     {
-      "record": 25,
+      "record": 33,
       "feedback": "Birthday party orders for chips and dips increased. Not traditional mixture anym",
       "true": "western_snack_influence",
       "predicted": "youth_driven_consumption",
       "confidence": 1.0
     },
     {
-      "record": 27,
+      "record": 35,
       "feedback": "Children influencing household purchases - if kid wants cheese puffs, parent buy",
       "true": "western_snack_influence",
       "predicted": "youth_driven_consumption",
       "confidence": 1.0
     },
     {
-      "record": 37,
-      "feedback": "Retailer said anniversary and birthday gifting with snack boxes is new trend thi",
-      "true": "premium_packaging_demand",
-      "predicted": "festive_gifting_trend",
-      "confidence": 1.0
-    },
-    {
-      "record": 39,
+      "record": 44,
       "feedback": "Retailer told me society bought 100 snack boxes for Diwali party. Big order miss",
       "true": "premium_packaging_demand",
       "predicted": "festive_gifting_trend",
       "confidence": 1.0
     },
     {
-      "record": 41,
-      "feedback": "Teacher gifts, colleague gifts - all shifting to snack hampers. Owner sees it ev",
+      "record": 45,
+      "feedback": "Owner told me baby shower and housewarming parties now include snack hampers as ",
       "true": "premium_packaging_demand",
       "predicted": "festive_gifting_trend",
       "confidence": 1.0
     },
     {
-      "record": 60,
-      "feedback": "Corporate gifting is real - 3 offices asked for bulk snack hampers in same week.",
-      "true": "festive_gifting_trend",
-      "predicted": "premium_packaging_demand",
-      "confidence": 1.0
-    },
-    {
-      "record": 63,
-      "feedback": "Customer wanted snacks packaged specifically to look like a corporate gift. Very",
-      "true": "festive_gifting_trend",
-      "predicted": "premium_packaging_demand",
-      "confidence": 1.0
-    },
-    {
-      "record": 73,
-      "feedback": "Owner told me children with diabetes are a heartbreaking but real segment. Paren",
-      "true": "sugar_free_demand",
-      "predicted": "health_conscious_snacking",
-      "confidence": 1.0
-    },
-    {
-      "record": 78,
-      "feedback": "Owner told me diet culture shift visible - macro-counting customers are real seg",
-      "true": "protein_snack_trend",
-      "predicted": "health_conscious_snacking",
-      "confidence": 1.0
-    },
-    {
-      "record": 81,
-      "feedback": "Fitness group in area active on WhatsApp - owner gets recommendations flow from ",
-      "true": "protein_snack_trend",
-      "predicted": "health_conscious_snacking",
-      "confidence": 1.0
-    },
-    {
-      "record": 99,
-      "feedback": "Owner confirmed raw mango season drives snack flavor demand too. Customers conne",
+      "record": 65,
+      "feedback": "Chaat snack trend from social media reached here. Customers asking for packaged ",
       "true": "tangy_sour_flavor_rise",
-      "predicted": "regional_flavor_revival",
+      "predicted": "fusion_flavor_adoption",
       "confidence": 1.0
     },
     {
-      "record": 100,
-      "feedback": "Owner told me kokum flavor becoming popular here. Coastal influence spreading in",
+      "record": 66,
+      "feedback": "Customers asking for both sour and spicy together. Chaat combination is the dema",
       "true": "tangy_sour_flavor_rise",
-      "predicted": "regional_flavor_revival",
+      "predicted": "fusion_flavor_adoption",
       "confidence": 1.0
     },
     {
-      "record": 101,
+      "record": 67,
       "feedback": "Owner told me chaat masala topped snacks selling in bulk near street food areas.",
       "true": "tangy_sour_flavor_rise",
       "predicted": "western_snack_influence",
       "confidence": 1.0
     },
     {
-      "record": 104,
-      "feedback": "Owner near chaat stall said customers want packaged version of what they eat as ",
+      "record": 68,
+      "feedback": "Owner confirmed raw mango season drives snack flavor demand too. Customers conne",
       "true": "tangy_sour_flavor_rise",
-      "predicted": "fusion_flavor_adoption",
+      "predicted": "regional_flavor_revival",
+      "confidence": 1.0
+    },
+    {
+      "record": 73,
+      "feedback": "Corporate gifting is real - 3 offices asked for bulk snack hampers in same week.",
+      "true": "festive_gifting_trend",
+      "predicted": "premium_packaging_demand",
+      "confidence": 1.0
+    },
+    {
+      "record": 76,
+      "feedback": "Owner told me snack gifting trend strongest in 25-40 age group. They want modern",
+      "true": "festive_gifting_trend",
+      "predicted": "youth_driven_consumption",
+      "confidence": 1.0
+    },
+    {
+      "record": 88,
+      "feedback": "Owner told me children with diabetes are a heartbreaking but real segment. Paren",
+      "true": "sugar_free_demand",
+      "predicted": "health_conscious_snacking",
+      "confidence": 1.0
+    },
+    {
+      "record": 93,
+      "feedback": "Owner told me diet culture shift visible - macro-counting customers are real seg",
+      "true": "protein_snack_trend",
+      "predicted": "health_conscious_snacking",
+      "confidence": 1.0
+    },
+    {
+      "record": 96,
+      "feedback": "Fitness group in area active on WhatsApp - owner gets recommendations flow from ",
+      "true": "protein_snack_trend",
+      "predicted": "health_conscious_snacking",
+      "confidence": 1.0
+    },
+    {
+      "record": 107,
+      "feedback": "Owner busy restocking shelves, no time for detailed conversation",
+      "true": "no_trend_detected",
+      "predicted": "convenience_format_preference",
+      "confidence": 1.0
+    },
+    {
+      "record": 108,
+      "feedback": "Stock arrived on time, owner had no complaints or feedback",
+      "true": "no_trend_detected",
+      "predicted": null,
+      "confidence": 1.0
+    },
+    {
+      "record": 109,
+      "feedback": "Regular customers buying same products as usual, nothing new",
+      "true": "no_trend_detected",
+      "predicted": "small_pack_affordability_preference",
       "confidence": 1.0
     }
   ],
@@ -258,6 +283,27 @@
       "correct": true
     },
     {
+      "feedback": "Retailer said youth doesn't care about health claims. Just wants taste and price",
+      "true": "youth_driven_consumption",
+      "predicted": "youth_driven_consumption",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Owner near school said children's influence on parent buying is huge. Kids decid",
+      "true": "youth_driven_consumption",
+      "predicted": "youth_driven_consumption",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Retailer near gaming cafe said youth snacking culture very strong there. Constan",
+      "true": "youth_driven_consumption",
+      "predicted": "youth_driven_consumption",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
       "feedback": "Students comparing pack sizes and prices loudly in store. Very price-value consc",
       "true": "youth_driven_consumption",
       "predicted": "small_pack_affordability_preference",
@@ -265,46 +311,81 @@
       "correct": false
     },
     {
-      "feedback": "Retailer said afternoon shift is entirely teenagers. Morning is adults, evening ",
+      "feedback": "Owner near junior college said students come in groups of 5-6. One buys, all tas",
       "true": "youth_driven_consumption",
       "predicted": "youth_driven_consumption",
       "confidence": 1.0,
       "correct": true
     },
     {
-      "feedback": "Retailer said after semester exams finished, youth snacking increased dramatical",
+      "feedback": "Retailer near coaching center says snacks sell more than water bottles during ex",
       "true": "youth_driven_consumption",
       "predicted": "youth_driven_consumption",
       "confidence": 1.0,
       "correct": true
     },
     {
-      "feedback": "Pocket money buyers - rupees 10 max per purchase but come every day. Volume adds",
+      "feedback": "Students requesting brands they saw advertised during cricket matches. Very medi",
       "true": "youth_driven_consumption",
-      "predicted": "small_pack_affordability_preference",
+      "predicted": "western_snack_influence",
       "confidence": 1.0,
       "correct": false
     },
     {
-      "feedback": "College canteen nearby owner said students skip meals but never skip snacking.",
+      "feedback": "Kids coming after tuition classes. 6pm to 8pm is pure youth rush at this store.",
       "true": "youth_driven_consumption",
       "predicted": "youth_driven_consumption",
       "confidence": 1.0,
       "correct": true
     },
     {
-      "feedback": "Owner said since new PG accommodations opened, evening sales up 40%. Pure youth ",
-      "true": "youth_driven_consumption",
-      "predicted": "youth_driven_consumption",
+      "feedback": "Owner said big pack buyer is rare in this area. Small frequent purchase is the p",
+      "true": "small_pack_affordability_preference",
+      "predicted": "small_pack_affordability_preference",
       "confidence": 1.0,
       "correct": true
     },
     {
-      "feedback": "College festival season - retailer said he sold 3x his normal volume in one week",
-      "true": "youth_driven_consumption",
-      "predicted": "youth_driven_consumption",
+      "feedback": "Owner told me rupees 5 pack is marketing tool - once they like taste, they buy b",
+      "true": "small_pack_affordability_preference",
+      "predicted": "small_pack_affordability_preference",
       "confidence": 1.0,
       "correct": true
+    },
+    {
+      "feedback": "Retailer told me small packs drive more brand trials than any sampling activity.",
+      "true": "small_pack_affordability_preference",
+      "predicted": "small_pack_affordability_preference",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Customers comparing number of pieces per rupee loudly in store. Very value-focus",
+      "true": "small_pack_affordability_preference",
+      "predicted": "small_pack_affordability_preference",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Kids know exact piece count in each pack size. Retailer amazed at their awarenes",
+      "true": "small_pack_affordability_preference",
+      "predicted": "small_pack_affordability_preference",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Retailer near slum area says small pack is 90% of revenue. Big pack irrelevant t",
+      "true": "small_pack_affordability_preference",
+      "predicted": "small_pack_affordability_preference",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Owner near tea stall said customers pair tea with rupees 5 snack pack. Daily rit",
+      "true": "small_pack_affordability_preference",
+      "predicted": "plant_based_adoption",
+      "confidence": 1.0,
+      "correct": false
     },
     {
       "feedback": "Owner told me regular masala not exciting enough. People want unusual flavor com",
@@ -454,27 +535,6 @@
       "correct": true
     },
     {
-      "feedback": "Working professionals paying extra for canister format. Says it looks premium.",
-      "true": "premium_packaging_demand",
-      "predicted": "premium_packaging_demand",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Retailer said anniversary and birthday gifting with snack boxes is new trend thi",
-      "true": "premium_packaging_demand",
-      "predicted": "festive_gifting_trend",
-      "confidence": 1.0,
-      "correct": false
-    },
-    {
-      "feedback": "Retailer said premium snack gifting trend started in metro cities, now reached s",
-      "true": "premium_packaging_demand",
-      "predicted": "premium_packaging_demand",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
       "feedback": "Retailer told me society bought 100 snack boxes for Diwali party. Big order miss",
       "true": "premium_packaging_demand",
       "predicted": "festive_gifting_trend",
@@ -482,77 +542,49 @@
       "correct": false
     },
     {
-      "feedback": "Customer asked for snacks that look good in photos. Said it is for Instagram.",
-      "true": "premium_packaging_demand",
-      "predicted": "premium_packaging_demand",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Teacher gifts, colleague gifts - all shifting to snack hampers. Owner sees it ev",
+      "feedback": "Owner told me baby shower and housewarming parties now include snack hampers as ",
       "true": "premium_packaging_demand",
       "predicted": "festive_gifting_trend",
       "confidence": 1.0,
       "correct": false
     },
     {
-      "feedback": "Owner said once customer buys premium pack and gets compliment, they never go ba",
+      "feedback": "Customer asked if we can customize the flavor combination inside a gift box. Pre",
       "true": "premium_packaging_demand",
       "predicted": "premium_packaging_demand",
       "confidence": 1.0,
       "correct": true
     },
     {
-      "feedback": "Retailer near temple said devotees asking for no-onion regional namkeen. Specifi",
-      "true": "regional_flavor_revival",
-      "predicted": "regional_flavor_revival",
+      "feedback": "Customers asking if we have anything gift-wrapped or in nice packaging. Not just",
+      "true": "premium_packaging_demand",
+      "predicted": "premium_packaging_demand",
       "confidence": 1.0,
       "correct": true
     },
     {
-      "feedback": "Retailer told me state food expo created huge demand for regional snacks this se",
-      "true": "regional_flavor_revival",
-      "predicted": "regional_flavor_revival",
+      "feedback": "Corporate office ordered employee gifting snack boxes - 50 pieces. Retailer coul",
+      "true": "premium_packaging_demand",
+      "predicted": "premium_packaging_demand",
       "confidence": 1.0,
       "correct": true
     },
     {
-      "feedback": "Retailer said farmers market nearby exposed customers to authentic local ingredi",
-      "true": "regional_flavor_revival",
-      "predicted": "regional_flavor_revival",
+      "feedback": "Owner near IT office said team celebration orders now include premium snack boxe",
+      "true": "premium_packaging_demand",
+      "predicted": "premium_packaging_demand",
       "confidence": 1.0,
       "correct": true
     },
     {
-      "feedback": "Older customers asking for karonda and amla flavored snacks. Nostalgia driving i",
-      "true": "regional_flavor_revival",
-      "predicted": "regional_flavor_revival",
+      "feedback": "Retailer near housing complex said RWA bulk orders only for premium boxes. Plain",
+      "true": "premium_packaging_demand",
+      "predicted": "premium_packaging_demand",
       "confidence": 1.0,
       "correct": true
     },
     {
-      "feedback": "Retailer confirmed regional small brand outselling national brand in his store t",
-      "true": "regional_flavor_revival",
-      "predicted": "regional_flavor_revival",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Local mela nearby increased demand for traditional regional snacks. Retailer sol",
-      "true": "regional_flavor_revival",
-      "predicted": "regional_flavor_revival",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Customer brought homemade snack sample and asked retailer to stock something sim",
-      "true": "regional_flavor_revival",
-      "predicted": "regional_flavor_revival",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Students near hostel want mini packs for tiffin. Parents sending them specific s",
+      "feedback": "Owner said delivery bags crush large packs. Customers prefer smaller packs that ",
       "true": "convenience_format_preference",
       "predicted": "convenience_format_preference",
       "confidence": 1.0,
@@ -601,21 +633,105 @@
       "correct": true
     },
     {
-      "feedback": "Owner told me festival season all customers asking for something gift-ready. Pou",
-      "true": "festive_gifting_trend",
-      "predicted": "festive_gifting_trend",
+      "feedback": "Owner said customers who went to native village during holiday came back craving",
+      "true": "regional_flavor_revival",
+      "predicted": "regional_flavor_revival",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Older customers asking for karonda and amla flavored snacks. Nostalgia driving i",
+      "true": "regional_flavor_revival",
+      "predicted": "regional_flavor_revival",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Retailer confirmed regional small brand outselling national brand in his store t",
+      "true": "regional_flavor_revival",
+      "predicted": "regional_flavor_revival",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Local mela nearby increased demand for traditional regional snacks. Retailer sol",
+      "true": "regional_flavor_revival",
+      "predicted": "regional_flavor_revival",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Retailer confirmed regional brands growing 3x faster than national brands in his",
+      "true": "regional_flavor_revival",
+      "predicted": "regional_flavor_revival",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Retailer told me state food expo created huge demand for regional snacks this se",
+      "true": "regional_flavor_revival",
+      "predicted": "regional_flavor_revival",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Retailer near temple said devotees asking for no-onion regional namkeen. Specifi",
+      "true": "regional_flavor_revival",
+      "predicted": "regional_flavor_revival",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Chaat snack trend from social media reached here. Customers asking for packaged ",
+      "true": "tangy_sour_flavor_rise",
+      "predicted": "fusion_flavor_adoption",
+      "confidence": 1.0,
+      "correct": false
+    },
+    {
+      "feedback": "Customers asking for both sour and spicy together. Chaat combination is the dema",
+      "true": "tangy_sour_flavor_rise",
+      "predicted": "fusion_flavor_adoption",
+      "confidence": 1.0,
+      "correct": false
+    },
+    {
+      "feedback": "Owner told me chaat masala topped snacks selling in bulk near street food areas.",
+      "true": "tangy_sour_flavor_rise",
+      "predicted": "western_snack_influence",
+      "confidence": 1.0,
+      "correct": false
+    },
+    {
+      "feedback": "Owner confirmed raw mango season drives snack flavor demand too. Customers conne",
+      "true": "tangy_sour_flavor_rise",
+      "predicted": "regional_flavor_revival",
+      "confidence": 1.0,
+      "correct": false
+    },
+    {
+      "feedback": "Customer asked retailer why imli flavor discontinued. Said it was their favorite",
+      "true": "tangy_sour_flavor_rise",
+      "predicted": "tangy_sour_flavor_rise",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Young customer explained - they like the mouth-watering sour feeling. Very speci",
+      "true": "tangy_sour_flavor_rise",
+      "predicted": "tangy_sour_flavor_rise",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Retailer confirmed sour skittle type flavors in snack format is new request from",
+      "true": "tangy_sour_flavor_rise",
+      "predicted": "tangy_sour_flavor_rise",
       "confidence": 1.0,
       "correct": true
     },
     {
       "feedback": "Owner told me engagement ceremony snack gifting is completely new trend this yea",
-      "true": "festive_gifting_trend",
-      "predicted": "festive_gifting_trend",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Owner said government offices also started gifting snack hampers during national",
       "true": "festive_gifting_trend",
       "predicted": "festive_gifting_trend",
       "confidence": 1.0,
@@ -643,11 +759,25 @@
       "correct": true
     },
     {
-      "feedback": "Customer wanted snacks packaged specifically to look like a corporate gift. Very",
+      "feedback": "Owner told me snack gifting trend strongest in 25-40 age group. They want modern",
       "true": "festive_gifting_trend",
-      "predicted": "premium_packaging_demand",
+      "predicted": "youth_driven_consumption",
       "confidence": 1.0,
       "correct": false
+    },
+    {
+      "feedback": "Customer asking for assorted snack box that includes sweet and salty both. Gifti",
+      "true": "festive_gifting_trend",
+      "predicted": "festive_gifting_trend",
+      "confidence": 1.0,
+      "correct": true
+    },
+    {
+      "feedback": "Owner told me festival season all customers asking for something gift-ready. Pou",
+      "true": "festive_gifting_trend",
+      "predicted": "festive_gifting_trend",
+      "confidence": 1.0,
+      "correct": true
     },
     {
       "feedback": "Viral reel showing snack hack - customers came same evening asking for specific ",
@@ -797,55 +927,6 @@
       "correct": true
     },
     {
-      "feedback": "Customers comparing number of pieces per rupee loudly in store. Very value-focus",
-      "true": "small_pack_affordability_preference",
-      "predicted": "small_pack_affordability_preference",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Retailer told me auto-rickshaw drivers buy rupees 5 packs at every traffic light",
-      "true": "small_pack_affordability_preference",
-      "predicted": "small_pack_affordability_preference",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Retailer told me small packs drive more brand trials than any sampling activity.",
-      "true": "small_pack_affordability_preference",
-      "predicted": "small_pack_affordability_preference",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Retailer near construction site said worker customers buy only rupees 2 and 5 pa",
-      "true": "small_pack_affordability_preference",
-      "predicted": "small_pack_affordability_preference",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Customer returned big pack because it went stale. Now only buys small. Common co",
-      "true": "small_pack_affordability_preference",
-      "predicted": "small_pack_affordability_preference",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Customer asked why no rupees 5 pack of specific flavor. Said big pack too expens",
-      "true": "small_pack_affordability_preference",
-      "predicted": "small_pack_affordability_preference",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Customer said bigger pack wasteful for solo eating. Small pack is perfect portio",
-      "true": "small_pack_affordability_preference",
-      "predicted": "small_pack_affordability_preference",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
       "feedback": "Owner near temple said devotees buy only vegan snacks. Big segment in this local",
       "true": "plant_based_adoption",
       "predicted": "plant_based_adoption",
@@ -895,53 +976,25 @@
       "correct": true
     },
     {
-      "feedback": "Owner confirmed raw mango season drives snack flavor demand too. Customers conne",
-      "true": "tangy_sour_flavor_rise",
-      "predicted": "regional_flavor_revival",
+      "feedback": "Owner busy restocking shelves, no time for detailed conversation",
+      "true": "no_trend_detected",
+      "predicted": "convenience_format_preference",
       "confidence": 1.0,
       "correct": false
     },
     {
-      "feedback": "Owner told me kokum flavor becoming popular here. Coastal influence spreading in",
-      "true": "tangy_sour_flavor_rise",
-      "predicted": "regional_flavor_revival",
+      "feedback": "Stock arrived on time, owner had no complaints or feedback",
+      "true": "no_trend_detected",
+      "predicted": null,
       "confidence": 1.0,
       "correct": false
     },
     {
-      "feedback": "Owner told me chaat masala topped snacks selling in bulk near street food areas.",
-      "true": "tangy_sour_flavor_rise",
-      "predicted": "western_snack_influence",
+      "feedback": "Regular customers buying same products as usual, nothing new",
+      "true": "no_trend_detected",
+      "predicted": "small_pack_affordability_preference",
       "confidence": 1.0,
       "correct": false
-    },
-    {
-      "feedback": "Kids and teenagers asking for extra sour options. Said regular flavors boring.",
-      "true": "tangy_sour_flavor_rise",
-      "predicted": "tangy_sour_flavor_rise",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Owner told me homemade imli candy seller nearby created a taste for intense sour",
-      "true": "tangy_sour_flavor_rise",
-      "predicted": "tangy_sour_flavor_rise",
-      "confidence": 1.0,
-      "correct": true
-    },
-    {
-      "feedback": "Owner near chaat stall said customers want packaged version of what they eat as ",
-      "true": "tangy_sour_flavor_rise",
-      "predicted": "fusion_flavor_adoption",
-      "confidence": 1.0,
-      "correct": false
-    },
-    {
-      "feedback": "Customer said tangy flavor helps them study late night. Alert and awake from sou",
-      "true": "tangy_sour_flavor_rise",
-      "predicted": "tangy_sour_flavor_rise",
-      "confidence": 1.0,
-      "correct": true
     }
   ]
 }
