@@ -1861,26 +1861,6 @@ with tab_chat:
                         <div class="explain-text">{_exp}</div>
                     </div>
                     """, unsafe_allow_html=True)
-                    _cf = r.get("counterfactual")
-                    if _cf and _cf.get("flipped"):
-                        _orig_trend = _ptrend.replace("_"," ").title()
-                        _new_trend = _cf["contrast_trend"].replace("_"," ").title()
-                        _orig_fb = str(r.get("_query_text", msg.get("query",""))).strip().strip('"').strip()
-                        st.markdown('<div style="color:#1E3A8A;font-weight:800;font-size:1rem;text-transform:uppercase;letter-spacing:0.05em;margin:1rem 0 0.5rem 0;">\U0001F9EA Counterfactual Test \u2014 does it read meaning, not keywords?</div>', unsafe_allow_html=True)
-                        st.markdown(
-                            '<div style="display:flex;gap:1rem;align-items:stretch;flex-wrap:wrap;">'
-                            '<div style="flex:1;min-width:240px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:12px;padding:1rem;">'
-                            '<div style="font-size:0.7rem;font-weight:700;color:#2563EB;text-transform:uppercase;letter-spacing:0.05em;">Original feedback</div>'
-                            f'<div style="font-size:0.95rem;color:#1F2937;margin:0.4rem 0 0.6rem 0;font-style:italic;">{_orig_fb}</div>'
-                            f'<div style="font-size:0.8rem;color:#64748B;">Model says:</div><div style="font-size:1rem;font-weight:800;color:#1D4ED8;">{_orig_trend}</div></div>'
-                            '<div style="display:flex;align-items:center;font-size:1.5rem;color:#94A3B8;font-weight:800;">\u2192</div>'
-                            '<div style="flex:1;min-width:240px;background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:1rem;">'
-                            '<div style="font-size:0.7rem;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:0.05em;">Meaning changed</div>'
-                            f'<div style="font-size:0.95rem;color:#1F2937;margin:0.4rem 0 0.6rem 0;font-style:italic;">"{_cf["contrast_text"]}"</div>'
-                            f'<div style="font-size:0.8rem;color:#64748B;">Model now says:</div><div style="font-size:1rem;font-weight:800;color:#DC2626;">{_new_trend}</div></div>'
-                            '</div>',
-                            unsafe_allow_html=True)
-                        st.markdown('<div style="font-size:0.85rem;color:#475569;margin-top:0.6rem;background:#F0FDF4;border-left:4px solid #16A34A;padding:0.6rem 0.9rem;border-radius:8px;">\u2705 Changing the <b>meaning</b> of the feedback changes the prediction \u2014 the model is interpreting intent, not just matching keywords.</div>', unsafe_allow_html=True)
                     st.plotly_chart(make_bar_chart(r), use_container_width=True, config={"displayModeBar":False}, key=f"chat_chart_{msg.get('query','')}_{_ptrend}")
                     _oem = OEM_ACTIONS.get(_ptrend, "Review trend signal and initiate NPD discussion.")
                     st.markdown(f"""

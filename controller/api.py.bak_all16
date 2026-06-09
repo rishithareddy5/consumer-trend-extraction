@@ -215,7 +215,6 @@ class TrendModel:
             "tertiary_trend": top[2][0],
             "tertiary_confidence": round(top[2][1], 4),
             "raw_generation": decoded,
-            "all_scores": [{"trend": lab, "confidence": round(sc, 4)} for lab, sc in scored],
         }
 
 
@@ -257,7 +256,6 @@ class PredictResponse(BaseModel):
     tertiary_trend: str
     tertiary_confidence: float
     raw_generation: str | None = None
-    all_scores: list | None = None
 
 
 @app.get("/health")
